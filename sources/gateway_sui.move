@@ -2,7 +2,7 @@ module gateway_sui::gateway;
 
 use sui::coin::{Self,Coin};
 use std::ascii::String;
-use sui::balance::{Self,Balance,Supply};
+use sui::balance::{Self,Balance};
 use sui::bag::{Self,Bag};
 use std::type_name::{get, into_string};
 
@@ -58,14 +58,15 @@ public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, _: &mut TxContext) {
     balance::join(&mut vault.balance, coin_balance);
 }
 
-public fun withdraw<T>(gateway: &mut Gateway, amount:u64, _cap: &WithdrawCap, ctx: &mut TxContext): u64 {
+public fun withdraw<T>(gateway: &mut Gateway, amount:u64, _cap: &WithdrawCap, ctx: &mut TxContext): Coin<T> {
     let vault_registered = is_registered<T>(gateway);
     assert!(vault_registered, 1);
     let coin_name = generate_coin_name<T>();
     let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
     let coin_out = coin::take(&mut vault.balance, amount, ctx);
-    transfer::public_transfer(coin_out, tx_context::sender(ctx));
-    amount
+    // transfer::public_transfer(coin_out, tx_context::sender(ctx));
+    // amount
+    coin_out
 }
 
 #[test_only]
@@ -106,9 +107,11 @@ fun test_register_vault() {
    {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
-        withdraw<SUI>(&mut gateway, 10, &cap, scenario.ctx());
+        let coins = withdraw<SUI>(&mut gateway, 10, &cap, scenario.ctx());
+        assert!(coin::value(&coins) == 10);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
+        transfer::public_transfer(coins, @0xA);
 
    };
    ts::next_tx(&mut scenario, @0xA);
