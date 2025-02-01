@@ -15,11 +15,20 @@ public struct Gateway has key {
     vaults: Bag,
 }
 
+public struct WithdrawCap has key, store {
+    id: UID,
+}
+
 fun init(ctx: &mut TxContext)  {
     let gateway = Gateway {
         id: object::new(ctx),
         vaults: bag::new(ctx),
     };
+
+    let cap = WithdrawCap {
+        id: object::new(ctx),
+    };
+    transfer::transfer(cap, tx_context::sender(ctx));
     transfer::share_object(gateway);
 }
 
@@ -49,7 +58,7 @@ public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, _: &mut TxContext) {
     balance::join(&mut vault.balance, coin_balance);
 }
 
-public fun withdraw<T>(gateway: &mut Gateway, amount:u64, ctx: &mut TxContext): u64 {
+public fun withdraw<T>(gateway: &mut Gateway, amount:u64, _cap: &WithdrawCap, ctx: &mut TxContext): u64 {
     let vault_registered = is_registered<T>(gateway);
     assert!(vault_registered, 1);
     let coin_name = generate_coin_name<T>();
@@ -85,7 +94,7 @@ fun test_register_vault() {
         ts::return_shared(gateway);
    };
 
-   ts::next_tx(&mut scenario, @0xA);
+   ts::next_tx(&mut scenario, @0xB);
    {
        let mut gateway = scenario.take_shared<Gateway>();
        // create some test coin
@@ -93,19 +102,21 @@ fun test_register_vault() {
        deposit(&mut gateway, coin, scenario.ctx());
        ts::return_shared(gateway);
    };
-   ts::next_tx(&mut scenario, @0xB);
+   ts::next_tx(&mut scenario, @0xA);
    {
         let mut gateway = scenario.take_shared<Gateway>();
-        withdraw<SUI>(&mut gateway, 10, scenario.ctx());
+        let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+        withdraw<SUI>(&mut gateway, 10, &cap, scenario.ctx());
+        ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
 
    };
-   ts::next_tx(&mut scenario, @0xB);
+   ts::next_tx(&mut scenario, @0xA);
    {
        // check the received coin on @0xB
-       let coin = ts::take_from_address<Coin<SUI>>(&scenario, @0xB);
+       let coin = ts::take_from_address<Coin<SUI>>(&scenario, @0xA);
        assert!(coin::value(&coin) == 10);
-       ts::return_to_address(@0xB, coin);
+       ts::return_to_address(@0xA, coin);
    };
    ts::end(scenario);
 }
