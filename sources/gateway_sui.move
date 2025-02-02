@@ -5,6 +5,7 @@ use std::ascii::String;
 use sui::balance::{Self,Balance};
 use sui::bag::{Self,Bag};
 use std::type_name::{get, into_string};
+use sui::event;
 
 public struct Vault<phantom T> has store {
     balance: Balance<T>,
@@ -49,13 +50,22 @@ public fun is_registered<T>(gateway: &Gateway): bool {
     bag::contains_with_type<String,Vault<T>>(&gateway.vaults, vault_name)
 }
 
-public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, _: &mut TxContext) {
+public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, ctx: &mut TxContext) {
     let vault_registered = is_registered<T>(gateway);
     assert!(vault_registered, 1);
+    let amount = coin.value();
+
     let coin_name = generate_coin_name<T>();
     let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
     let coin_balance = coin.into_balance();
     balance::join(&mut vault.balance, coin_balance);
+    // Emit deposit event
+    let event = DepositEvent {
+        coin_type: coin_name,
+        amount: amount,
+        depositor: tx_context::sender(ctx),
+    };
+    event::emit(event);
 }
 
 public fun withdraw<T>(gateway: &mut Gateway, amount:u64, _cap: &WithdrawCap, ctx: &mut TxContext): Coin<T> {
@@ -67,6 +77,24 @@ public fun withdraw<T>(gateway: &mut Gateway, amount:u64, _cap: &WithdrawCap, ct
     // transfer::public_transfer(coin_out, tx_context::sender(ctx));
     // amount
     coin_out
+}
+
+// events
+public struct DepositEvent has copy, drop {
+    coin_type: String,
+    amount: u64,
+    depositor: address,
+}
+
+
+
+// query functions
+public fun get_vault_balance<T>(gateway: &Gateway): u64 {
+    let vault_registered = is_registered<T>(gateway);
+    assert!(vault_registered, 1);
+    let coin_name = generate_coin_name<T>();
+    let vault = bag::borrow<String, Vault<T>>(&gateway.vaults, coin_name);
+    balance::value(&vault.balance)
 }
 
 #[test_only]
