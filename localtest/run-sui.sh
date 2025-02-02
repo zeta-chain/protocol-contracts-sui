@@ -14,7 +14,7 @@ child_pid=$!
 
 # In a separate background job, sleep for 1 hour and then kill the Sui process
 {
-  sleep 3600  # 1 hour
+  sleep 600  # 1 hour
   kill $child_pid 2>/dev/null
 } &
 timer_pid=$!

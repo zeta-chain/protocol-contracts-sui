@@ -11,10 +11,45 @@ import (
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/signer"
 	"github.com/block-vision/sui-go-sdk/sui"
+	"github.com/block-vision/sui-go-sdk/utils"
 )
 
 //go:embed gateway.mv
 var gatewayBinary []byte
+
+// find one object owned by the address and has the type of typeName
+func filterOwnedObject(cli sui.ISuiAPI, address string, typeName string) (objId string, err error) {
+	suiObjectResponseQuery := models.SuiObjectResponseQuery{
+		// for the filter see JSON-RPC doc: https://docs.sui.io/sui-api-ref#suix_getownedobjects
+		Filter: models.SuiObjectDataFilter{
+			"StructType": typeName,
+		},
+		// only fetch the effects field
+		Options: models.SuiObjectDataOptions{
+			ShowType:    true,
+			ShowContent: true,
+			ShowBcs:     true,
+			ShowOwner:   true,
+		},
+	}
+	resp, err := cli.SuiXGetOwnedObjects(context.Background(), models.SuiXGetOwnedObjectsRequest{
+		Address: address,
+		Query:   suiObjectResponseQuery,
+		Limit:   50,
+	})
+	if err != nil {
+		return "", err
+	}
+	fmt.Printf("filterning out (of %d) owned object matching typeName=%s", len(resp.Data), typeName)
+	for _, data := range resp.Data {
+		if data.Data.Type == typeName {
+			fmt.Printf("owned objects: %s, %v\n", data.Data.ObjectId, data.Data.Content)
+			objId = data.Data.ObjectId
+			return objId, nil
+		}
+	}
+	return "", fmt.Errorf("no object of type %s found", typeName)
+}
 
 func main() {
 	var moduleId string
@@ -28,34 +63,8 @@ func main() {
 
 	printBalance(ctx, cli, signerAccount)
 	printBalance(ctx, cli, signerAccount)
-	var coinObjectId string
-	{
-		suiObjectResponseQuery := models.SuiObjectResponseQuery{
-			// only fetch the effects field
-			Options: models.SuiObjectDataOptions{
-				ShowType:    true,
-				ShowContent: true,
-				ShowBcs:     true,
-				ShowOwner:   true,
-			},
-		}
-		resp, err := cli.SuiXGetOwnedObjects(ctx, models.SuiXGetOwnedObjectsRequest{
-			Address: signerAccount.Address,
-			Query:   suiObjectResponseQuery,
-			Limit:   5,
-		})
-		if err != nil {
-			panic(err)
-		}
-		for _, data := range resp.Data {
-			fmt.Printf("%s \n", data.Data.Type)
-			if data.Data.Type == "0x2::coin::Coin<0x2::sui::SUI>" {
-				fmt.Printf("owned objects: %s, %v\n", data.Data.ObjectId, data.Data.Content)
-				coinObjectId = data.Data.ObjectId
-				break
-			}
-		}
-	}
+
+	coinObjectId, err := filterOwnedObject(cli, signerAccount.Address, "0x2::coin::Coin<0x2::sui::SUI>")
 
 	fmt.Printf("Length of Gateway.mv: %d\n", len(gatewayBinary))
 	gatewayBase64 := base64.StdEncoding.EncodeToString(gatewayBinary)
@@ -183,7 +192,47 @@ func main() {
 
 	// Withdraw SUI
 	{
+		// acquire the WithdrawCap object first
+		typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
+		withdrawCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("withdrawcap id %s\n", withdrawCapId)
+		if withdrawCapId == "" {
+			panic("failed to find WithdrawCap object")
+		}
+		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
+			Signer:          signerAccount.Address,
+			PackageObjectId: moduleId,
+			Module:          "gateway",
+			Function:        "withdraw",
+			TypeArguments:   []interface{}{"0x2::sui::SUI"},
+			Arguments:       []interface{}{gatewayObjectId, "12345", withdrawCapId},
+			GasBudget:       "5000000000",
+		})
+		if err != nil {
+			panic(err)
+		}
 
+		resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
+			TxnMetaData: tx,
+			PriKey:      signerAccount.PriKey,
+			Options: models.SuiTransactionBlockOptions{
+				ShowEffects:        true,
+				ShowBalanceChanges: true,
+				ShowEvents:         true,
+			},
+			RequestType: "WaitForLocalExecution",
+		})
+		if err != nil {
+			panic(err)
+		}
+		utils.PrettyPrint(resp)
+
+		if resp.Effects.Status.Status != "success" {
+			panic("failed to withdraw")
+		}
 	}
 }
 
