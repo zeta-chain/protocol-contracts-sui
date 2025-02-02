@@ -79,6 +79,11 @@ public fun withdraw<T>(gateway: &mut Gateway, amount:u64, _cap: &WithdrawCap, ct
     coin_out
 }
 
+entry fun withdraw_to_address<T>(gateway: &mut Gateway, amount:u64, recipient: address, cap: &WithdrawCap, ctx: &mut TxContext) {
+    let coin = withdraw<T>(gateway, amount, cap, ctx);
+    transfer::public_transfer(coin, recipient);
+}
+
 // events
 public struct DepositEvent has copy, drop {
     coin_type: String,

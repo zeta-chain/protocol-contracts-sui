@@ -202,13 +202,15 @@ func main() {
 		if withdrawCapId == "" {
 			panic("failed to find WithdrawCap object")
 		}
+		bob := "0x12030d7d9a343d7c31856da0bf6c5706b34035a610284ff5a47e11e990ce4c5b"
+		amt := "12345"
 		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
 			Signer:          signerAccount.Address,
 			PackageObjectId: moduleId,
 			Module:          "gateway",
-			Function:        "withdraw",
+			Function:        "withdraw_to_address",
 			TypeArguments:   []interface{}{"0x2::sui::SUI"},
-			Arguments:       []interface{}{gatewayObjectId, "12345", withdrawCapId},
+			Arguments:       []interface{}{gatewayObjectId, amt, bob, withdrawCapId},
 			GasBudget:       "5000000000",
 		})
 		if err != nil {
@@ -228,10 +230,17 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		utils.PrettyPrint(resp)
-
 		if resp.Effects.Status.Status != "success" {
+			utils.PrettyPrint(resp)
 			panic("failed to withdraw")
+		}
+		for _, change := range resp.BalanceChanges {
+			if change.Owner.AddressOwner == bob {
+				fmt.Printf("Withdraw amount: %s\n", change.Amount)
+				if change.Amount != amt {
+					panic("withdraw amount mismatch")
+				}
+			}
 		}
 	}
 }
