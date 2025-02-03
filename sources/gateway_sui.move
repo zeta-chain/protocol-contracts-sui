@@ -14,6 +14,7 @@ public struct Vault<phantom T> has store {
 public struct Gateway has key {
     id: UID,
     vaults: Bag,
+    nonce: u64,
 }
 
 public struct WithdrawCap has key, store {
@@ -28,6 +29,7 @@ fun init(ctx: &mut TxContext)  {
     let gateway = Gateway {
         id: object::new(ctx),
         vaults: bag::new(ctx),
+        nonce: 0,
     };
 
     // to withdraw tokens from the gateway, the caller must have the WithdrawCap
@@ -86,19 +88,19 @@ public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ct
 }
 
 
-public fun withdraw<T>(gateway: &mut Gateway, amount:u64, _cap: &WithdrawCap, ctx: &mut TxContext): Coin<T> {
+public fun withdraw<T>(gateway: &mut Gateway, amount:u64, nonce:u64,  _cap: &WithdrawCap, ctx: &mut TxContext): Coin<T> {
     let vault_registered = is_registered<T>(gateway);
     assert!(vault_registered, 1);
+    assert!(nonce == gateway.nonce, 4); // prevent replay
     let coin_name = generate_coin_name<T>();
     let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
     let coin_out = coin::take(&mut vault.balance, amount, ctx);
-    // transfer::public_transfer(coin_out, tx_context::sender(ctx));
-    // amount
+    gateway.nonce = nonce + 1;
     coin_out
 }
 
-entry fun withdraw_to_address<T>(gateway: &mut Gateway, amount:u64, recipient: address, cap: &WithdrawCap, ctx: &mut TxContext) {
-    let coin = withdraw<T>(gateway, amount, cap, ctx);
+entry fun withdraw_to_address<T>(gateway: &mut Gateway, amount:u64, nonce:u64, recipient: address,  cap: &WithdrawCap, ctx: &mut TxContext) {
+    let coin = withdraw<T>(gateway, amount, nonce, cap, ctx);
     transfer::public_transfer(coin, recipient);
 }
 
@@ -163,7 +165,8 @@ fun test_register_vault() {
    {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
-        let coins = withdraw<SUI>(&mut gateway, 10, &cap, scenario.ctx());
+        let nonce = gateway.nonce;
+        let coins = withdraw<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
         assert!(coin::value(&coins) == 10);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
@@ -171,10 +174,14 @@ fun test_register_vault() {
    };
    ts::next_tx(&mut scenario, @0xA);
    {
+       let gateway = scenario.take_shared<Gateway>();
+       assert!(gateway.nonce == 1); // nonce should be updated
        // check the received coin on @0xB
        let coin = ts::take_from_address<Coin<SUI>>(&scenario, @0xA);
        assert!(coin::value(&coin) == 10);
        ts::return_to_address(@0xA, coin);
+       ts::return_shared(gateway);
+
    };
    ts::end(scenario);
 }

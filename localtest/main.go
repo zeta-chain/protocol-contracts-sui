@@ -292,13 +292,14 @@ func main() {
 		}
 		bob := "0x12030d7d9a343d7c31856da0bf6c5706b34035a610284ff5a47e11e990ce4c5b"
 		amt := "12345"
+		nonce := "0"
 		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
 			Signer:          signerAccount.Address,
 			PackageObjectId: moduleId,
 			Module:          "gateway",
 			Function:        "withdraw_to_address",
 			TypeArguments:   []interface{}{"0x2::sui::SUI"},
-			Arguments:       []interface{}{gatewayObjectId, amt, bob, withdrawCapId},
+			Arguments:       []interface{}{gatewayObjectId, amt, nonce, bob, withdrawCapId},
 			GasBudget:       "5000000000",
 		})
 		if err != nil {
