@@ -20,17 +20,28 @@ public struct WithdrawCap has key, store {
     id: UID,
 }
 
+public struct AdminCap has key, store {
+    id: UID,
+}
+
 fun init(ctx: &mut TxContext)  {
     let gateway = Gateway {
         id: object::new(ctx),
         vaults: bag::new(ctx),
     };
 
-    let cap = WithdrawCap {
+    // to withdraw tokens from the gateway, the caller must have the WithdrawCap
+    let withdraw_cap = WithdrawCap {
         id: object::new(ctx),
     };
-    transfer::transfer(cap, tx_context::sender(ctx));
+    transfer::transfer(withdraw_cap, tx_context::sender(ctx));
     transfer::share_object(gateway);
+
+    // to register a new vault, the caller must have the AdminCap
+    let admin_cap = AdminCap {
+        id: object::new(ctx),
+    };
+    transfer::transfer(admin_cap, tx_context::sender(ctx));
 }
 
 public fun generate_coin_name<T>(): String {
@@ -38,7 +49,7 @@ public fun generate_coin_name<T>(): String {
 }
 
 // add a capability object to restrict the priviledge of register_vault, liek the WithdrawCap
-public fun register_vault<T>(gateway: &mut Gateway) {
+public fun register_vault<T>(gateway: &mut Gateway, _cap: &AdminCap) {
     assert!(is_registered<T>(gateway) == false, 3);
     let vault_name = generate_coin_name<T>();
     let vault = Vault<T> {

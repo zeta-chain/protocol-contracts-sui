@@ -122,17 +122,59 @@ func main() {
 		panic("failed to create gateway object")
 	}
 
-	{ // register vault2
+	{ // register vault2 from signer2;
+		// first need to transfer the adminCap from signer1 to signer2
+		// 	typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
+		typeName := fmt.Sprintf("%s::gateway::AdminCap", moduleId)
+		adminCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("adminCapId id %s\n", adminCapId)
+		if adminCapId == "" {
+			panic("failed to find WithdrawCap object")
+		}
+
 		s2 := signer2.NewSignerSecp256k1Random()
 		fmt.Printf("signer2 address: %s\n", s2.Address())
 		RequestLocalNetSuiFromFaucet(string(s2.Address()))
+
+		{
+			tx, err := cli.TransferObject(ctx, models.TransferObjectRequest{
+				Signer:    signerAccount.Address,
+				ObjectId:  adminCapId,
+				Recipient: string(s2.Address()),
+				GasBudget: "5000000000",
+			})
+			if err != nil {
+				panic(err)
+			}
+
+			resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
+				TxnMetaData: tx,
+				PriKey:      signerAccount.PriKey,
+				Options: models.SuiTransactionBlockOptions{
+					ShowEffects: true,
+				},
+				RequestType: "WaitForLocalExecution",
+			})
+			if err != nil {
+				panic(err)
+			}
+
+			if resp.Effects.Status.Status != "success" {
+				panic("failed to transfer AdminCap")
+			}
+			fmt.Printf("AdminCap transferred to signer2\n")
+		}
+
 		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
 			Signer:          string(s2.Address()),
 			PackageObjectId: moduleId,
 			Module:          "gateway",
 			Function:        "register_vault",
 			TypeArguments:   []interface{}{"0x2::sui::SUI"},
-			Arguments:       []interface{}{gatewayObjectId},
+			Arguments:       []interface{}{gatewayObjectId, adminCapId},
 			GasBudget:       "5000000000",
 		})
 		if err != nil {
@@ -289,6 +331,8 @@ func main() {
 			}
 		}
 	}
+
+	fmt.Printf("Success!\n")
 }
 
 func printBalance(ctx context.Context, cli sui.ISuiAPI, signerAccount *signer.Signer) {
