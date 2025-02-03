@@ -199,37 +199,6 @@ func main() {
 		// utils.PrettyPrint(resp)
 	}
 
-	// { // register vault
-	// 	tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
-	// 		Signer:          signerAccount.Address,
-	// 		PackageObjectId: moduleId,
-	// 		Module:          "gateway",
-	// 		Function:        "register_vault",
-	// 		TypeArguments:   []interface{}{"0x2::sui::SUI"},
-	// 		Arguments:       []interface{}{gatewayObjectId},
-	// 		GasBudget:       "5000000000",
-	// 	})
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
-	// 		TxnMetaData: tx,
-	// 		PriKey:      signerAccount.PriKey,
-	// 		Options: models.SuiTransactionBlockOptions{
-	// 			ShowEffects: true,
-	// 		},
-	// 		RequestType: "WaitForLocalExecution",
-	// 	})
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	// check status of tx
-	// 	if resp.Effects.Status.Status != "success" {
-	// 		panic("failed to register vault")
-	// 	}
-	// 	// utils.PrettyPrint(resp)
-	// }
-
 	// Deposit SUI
 	{
 		zetaEthAddress := "0x7c125C1d515b8945841b3d5144a060115C58725F"
