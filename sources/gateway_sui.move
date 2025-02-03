@@ -141,10 +141,12 @@ fun test_register_vault() {
    ts::next_tx(&mut scenario, @0xA);
    {
         let mut  gateway = scenario.take_shared<Gateway>();
-        register_vault<SUI>(&mut gateway);
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        register_vault<SUI>(&mut gateway, &admin_cap);
         let b = is_registered<SUI>(&gateway);
         assert!(b);
         ts::return_shared(gateway);
+        ts::return_to_address(@0xA, admin_cap);
    };
 
    ts::next_tx(&mut scenario, @0xB);

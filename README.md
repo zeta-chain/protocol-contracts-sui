@@ -2,8 +2,13 @@
 ## Prerequisites
 install SUI toolchain: https://github.com/MystenLabs/sui
 
+## Unit test
 
-## Test
+```
+sui move test
+```
+
+## Integration Test
 
 First compile and run the validator
 ```
