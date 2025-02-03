@@ -37,7 +37,9 @@ public fun generate_coin_name<T>(): String {
    into_string(get<T>())
 }
 
+// add a capability object to restrict the priviledge of register_vault, liek the WithdrawCap
 public fun register_vault<T>(gateway: &mut Gateway) {
+    assert!(is_registered<T>(gateway) == false, 3);
     let vault_name = generate_coin_name<T>();
     let vault = Vault<T> {
         balance: balance::zero<T>(),
@@ -50,8 +52,10 @@ public fun is_registered<T>(gateway: &Gateway): bool {
     bag::contains_with_type<String,Vault<T>>(&gateway.vaults, vault_name)
 }
 
+// TODO: add a separate interface deposit_and_call to match the other chain intefaces?
 public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ctx: &mut TxContext) {
-    // assert!(receiver.length() == 20, 2);
+    // TODO: use string as error code?
+    assert!(receiver.length() == 42, 2);
     let vault_registered = is_registered<T>(gateway);
     assert!(vault_registered, 1);
     let amount = coin.value();
@@ -69,6 +73,7 @@ public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ct
     };
     event::emit(event);
 }
+
 
 public fun withdraw<T>(gateway: &mut Gateway, amount:u64, _cap: &WithdrawCap, ctx: &mut TxContext): Coin<T> {
     let vault_registered = is_registered<T>(gateway);

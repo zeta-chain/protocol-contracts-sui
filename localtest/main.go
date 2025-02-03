@@ -12,6 +12,8 @@ import (
 	"github.com/block-vision/sui-go-sdk/signer"
 	"github.com/block-vision/sui-go-sdk/sui"
 	"github.com/block-vision/sui-go-sdk/utils"
+
+	signer2 "github.com/brewmaster012/sui-gateway/signer"
 )
 
 //go:embed gateway.mv
@@ -60,6 +62,7 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("address: %s\n", signerAccount.Address)
+	cli.SuiExecuteTransactionBlock(ctx, models.SuiExecuteTransactionBlockRequest{})
 
 	printBalance(ctx, cli, signerAccount)
 	printBalance(ctx, cli, signerAccount)
@@ -119,9 +122,12 @@ func main() {
 		panic("failed to create gateway object")
 	}
 
-	{
+	{ // register vault2
+		s2 := signer2.NewSignerSecp256k1Random()
+		fmt.Printf("signer2 address: %s\n", s2.Address())
+		RequestLocalNetSuiFromFaucet(string(s2.Address()))
 		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
-			Signer:          signerAccount.Address,
+			Signer:          string(s2.Address()),
 			PackageObjectId: moduleId,
 			Module:          "gateway",
 			Function:        "register_vault",
@@ -132,9 +138,9 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
+		resp, err := s2.SignAndExecuteTransactionBlock(ctx, cli, models.SignAndExecuteTransactionBlockRequest{
 			TxnMetaData: tx,
-			PriKey:      signerAccount.PriKey,
+			PriKey:      signerAccount.PriKey, // this one is not used as it's ed25119, just for compat
 			Options: models.SuiTransactionBlockOptions{
 				ShowEffects: true,
 			},
@@ -147,8 +153,40 @@ func main() {
 		if resp.Effects.Status.Status != "success" {
 			panic("failed to register vault")
 		}
+		fmt.Printf("SUI vault registered\n")
 		// utils.PrettyPrint(resp)
 	}
+
+	// { // register vault
+	// 	tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
+	// 		Signer:          signerAccount.Address,
+	// 		PackageObjectId: moduleId,
+	// 		Module:          "gateway",
+	// 		Function:        "register_vault",
+	// 		TypeArguments:   []interface{}{"0x2::sui::SUI"},
+	// 		Arguments:       []interface{}{gatewayObjectId},
+	// 		GasBudget:       "5000000000",
+	// 	})
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
+	// 		TxnMetaData: tx,
+	// 		PriKey:      signerAccount.PriKey,
+	// 		Options: models.SuiTransactionBlockOptions{
+	// 			ShowEffects: true,
+	// 		},
+	// 		RequestType: "WaitForLocalExecution",
+	// 	})
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	// check status of tx
+	// 	if resp.Effects.Status.Status != "success" {
+	// 		panic("failed to register vault")
+	// 	}
+	// 	// utils.PrettyPrint(resp)
+	// }
 
 	// Deposit SUI
 	{
@@ -179,8 +217,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		// utils.PrettyPrint(resp)
 		if resp.Effects.Status.Status != "success" {
+			utils.PrettyPrint(resp)
 			panic("failed to deposit")
 		}
 		amtStr := resp.Events[0].ParsedJson["amount"].(string)
@@ -196,7 +234,6 @@ func main() {
 		} else {
 			fmt.Printf("event match! receiver address: %s\n", receiverAddrHex)
 		}
-
 	}
 
 	// Withdraw SUI
