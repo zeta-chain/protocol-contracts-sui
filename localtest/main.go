@@ -152,13 +152,14 @@ func main() {
 
 	// Deposit SUI
 	{
+		zetaEthAddress := "0x7c125C1d515b8945841b3d5144a060115C58725F"
 		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
 			Signer:          signerAccount.Address,
 			PackageObjectId: moduleId,
 			Module:          "gateway",
 			Function:        "deposit",
 			TypeArguments:   []interface{}{"0x2::sui::SUI"},
-			Arguments:       []interface{}{gatewayObjectId, coinObjectId},
+			Arguments:       []interface{}{gatewayObjectId, coinObjectId, zetaEthAddress},
 			GasBudget:       "5000000000",
 		})
 		if err != nil {
@@ -188,6 +189,14 @@ func main() {
 		if amount == 0 {
 			panic("failed to deposit")
 		}
+
+		receiverAddrHex := resp.Events[0].ParsedJson["receiver"].(string)
+		if receiverAddrHex != zetaEthAddress {
+			panic("receiver address mismatch")
+		} else {
+			fmt.Printf("event match! receiver address: %s\n", receiverAddrHex)
+		}
+
 	}
 
 	// Withdraw SUI

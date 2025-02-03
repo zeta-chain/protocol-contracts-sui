@@ -4,6 +4,7 @@ go 1.22.5
 
 require (
 	github.com/block-vision/sui-go-sdk v1.0.6
+	github.com/davecgh/go-spew v1.1.1
 
 )
 

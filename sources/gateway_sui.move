@@ -1,7 +1,7 @@
 module gateway_sui::gateway;
 
 use sui::coin::{Self,Coin};
-use std::ascii::String;
+use std::ascii::{String};
 use sui::balance::{Self,Balance};
 use sui::bag::{Self,Bag};
 use std::type_name::{get, into_string};
@@ -50,7 +50,8 @@ public fun is_registered<T>(gateway: &Gateway): bool {
     bag::contains_with_type<String,Vault<T>>(&gateway.vaults, vault_name)
 }
 
-public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, ctx: &mut TxContext) {
+public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ctx: &mut TxContext) {
+    // assert!(receiver.length() == 20, 2);
     let vault_registered = is_registered<T>(gateway);
     assert!(vault_registered, 1);
     let amount = coin.value();
@@ -64,6 +65,7 @@ public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, ctx: &mut TxContext)
         coin_type: coin_name,
         amount: amount,
         depositor: tx_context::sender(ctx),
+        receiver: receiver,
     };
     event::emit(event);
 }
@@ -89,6 +91,7 @@ public struct DepositEvent has copy, drop {
     coin_type: String,
     amount: u64,
     depositor: address,
+    receiver: String, // 0x hex address
 }
 
 
@@ -133,9 +136,11 @@ fun test_register_vault() {
        let mut gateway = scenario.take_shared<Gateway>();
        // create some test coin
        let coin = test_coin(&mut scenario);
-       deposit(&mut gateway, coin, scenario.ctx());
+       let ethAddr = b"0x7c125C1d515b8945841b3d5144a060115C58725F".to_string().to_ascii();
+       deposit(&mut gateway, coin, ethAddr, scenario.ctx());
        ts::return_shared(gateway);
    };
+
    ts::next_tx(&mut scenario, @0xA);
    {
         let mut gateway = scenario.take_shared<Gateway>();
@@ -145,7 +150,6 @@ fun test_register_vault() {
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
-
    };
    ts::next_tx(&mut scenario, @0xA);
    {
