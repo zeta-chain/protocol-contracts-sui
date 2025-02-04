@@ -1,13 +1,14 @@
 module gateway::gateway;
 
-use sui::coin::{Self,Coin};
-use std::ascii::{String};
-use sui::balance::{Self,Balance};
-use sui::bag::{Self,Bag};
+use std::ascii::String;
 use std::type_name::{get, into_string};
+use sui::bag::{Self, Bag};
+use sui::balance::{Self, Balance};
+use sui::coin::{Self, Coin};
 use sui::event;
 
 // === Errors ===
+
 const EVaultAlreadyRegistered: u64 = 0;
 const EReceiverAddressInvalid: u64 = 1;
 const EVaultNotRegistered: u64 = 2;
@@ -34,6 +35,7 @@ public struct AdminCap has key, store {
 }
 
 // === Events ===
+
 public struct DepositEvent has copy, drop {
     coin_type: String,
     amount: u64,
@@ -41,9 +43,7 @@ public struct DepositEvent has copy, drop {
     receiver: String, // 0x hex address
 }
 
-
-
-fun init(ctx: &mut TxContext)  {
+fun init(ctx: &mut TxContext) {
     let gateway = Gateway {
         id: object::new(ctx),
         vaults: bag::new(ctx),
@@ -65,7 +65,7 @@ fun init(ctx: &mut TxContext)  {
 }
 
 public fun generate_coin_name<T>(): String {
-   into_string(get<T>())
+    into_string(get<T>())
 }
 
 // add a capability object to restrict the priviledge of register_vault, liek the WithdrawCap
@@ -80,7 +80,7 @@ public fun register_vault<T>(gateway: &mut Gateway, _cap: &AdminCap) {
 
 public fun is_registered<T>(gateway: &Gateway): bool {
     let vault_name = generate_coin_name<T>();
-    bag::contains_with_type<String,Vault<T>>(&gateway.vaults, vault_name)
+    bag::contains_with_type<String, Vault<T>>(&gateway.vaults, vault_name)
 }
 
 // TODO: add a separate interface deposit_and_call to match the other chain intefaces?
@@ -105,8 +105,13 @@ public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ct
     event::emit(event);
 }
 
-
-public fun withdraw<T>(gateway: &mut Gateway, amount:u64, nonce:u64,  _cap: &WithdrawCap, ctx: &mut TxContext): Coin<T> {
+public fun withdraw<T>(
+    gateway: &mut Gateway,
+    amount: u64,
+    nonce: u64,
+    _cap: &WithdrawCap,
+    ctx: &mut TxContext,
+): Coin<T> {
     let vault_registered = is_registered<T>(gateway);
     assert!(vault_registered, EVaultNotRegistered);
     assert!(nonce == gateway.nonce, ENonceMismatch); // prevent replay
@@ -117,11 +122,17 @@ public fun withdraw<T>(gateway: &mut Gateway, amount:u64, nonce:u64,  _cap: &Wit
     coin_out
 }
 
-entry fun withdraw_to_address<T>(gateway: &mut Gateway, amount:u64, nonce:u64, recipient: address,  cap: &WithdrawCap, ctx: &mut TxContext) {
+entry fun withdraw_to_address<T>(
+    gateway: &mut Gateway,
+    amount: u64,
+    nonce: u64,
+    recipient: address,
+    cap: &WithdrawCap,
+    ctx: &mut TxContext,
+) {
     let coin = withdraw<T>(gateway, amount, nonce, cap, ctx);
     transfer::public_transfer(coin, recipient);
 }
-
 
 // === View Functions ===
 public fun nonce(gateway: &Gateway): u64 {
