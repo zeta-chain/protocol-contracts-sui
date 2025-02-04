@@ -5,7 +5,7 @@ use gateway::gateway::{
     Gateway,
     register_vault,
     deposit,
-    withdraw,
+    withdraw_impl,
     is_registered,
     WithdrawCap,
     AdminCap,
@@ -63,7 +63,7 @@ fun test_register_deposit_withdraw() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce();
-        let coins = withdraw<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
         assert!(coin::value(&coins) == 10);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
@@ -92,7 +92,7 @@ fun test_withdraw_wrong_nonce() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce() + 1; // intentially create a mismatch
-        let coins = withdraw<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
         assert!(coin::value(&coins) == 10);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
