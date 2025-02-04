@@ -1,4 +1,4 @@
-module gateway_sui::gateway;
+module gateway::gateway;
 
 use sui::coin::{Self,Coin};
 use std::ascii::{String};

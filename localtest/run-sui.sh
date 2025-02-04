@@ -7,7 +7,7 @@ cleanup() {
 # Trap SIGINT (Ctrl-C) so we can do cleanup
 trap cleanup INT
 
-sui move build && cp build/gateway_sui/bytecode_modules/gateway.mv localtest
+sui move build && cp build/gateway/bytecode_modules/gateway.mv localtest
 
 # Start the Sui process in the background
 RUST_LOG="off,sui_node=info" sui start --with-faucet --force-regenesis &
