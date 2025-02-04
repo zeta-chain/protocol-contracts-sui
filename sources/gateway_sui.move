@@ -122,20 +122,6 @@ entry fun withdraw_to_address<T>(gateway: &mut Gateway, amount:u64, nonce:u64, r
     transfer::public_transfer(coin, recipient);
 }
 
-
-// === View Functions ===
-public fun nonce(gateway: &Gateway): u64 {
-    gateway.nonce
-}
-
-public fun get_vault_balance<T>(gateway: &Gateway): u64 {
-    let vault_registered = is_registered<T>(gateway);
-    assert!(vault_registered, EVaultNotRegistered);
-    let coin_name = generate_coin_name<T>();
-    let vault = bag::borrow<String, Vault<T>>(&gateway.vaults, coin_name);
-    balance::value(&vault.balance)
-}
-
 #[test_only]
 public fun init_for_testing(ctx: &mut TxContext) {
     init(ctx)
