@@ -3,10 +3,10 @@ module gateway::gateway_tests;
 
 use gateway::gateway::{
     Gateway,
-    register_vault,
+    whitelist,
     deposit,
     withdraw_impl,
-    is_registered,
+    is_whitelisted,
     WithdrawCap,
     AdminCap,
     init_for_testing,
@@ -35,8 +35,8 @@ fun setup(scenario: &mut Scenario) {
     {
         let mut gateway = scenario.take_shared<Gateway>();
         let admin_cap = ts::take_from_address<AdminCap>(scenario, @0xA);
-        register_vault<SUI>(&mut gateway, &admin_cap);
-        let b = is_registered<SUI>(&gateway);
+        whitelist<SUI>(&mut gateway, &admin_cap);
+        let b = is_whitelisted<SUI>(&gateway);
         assert!(b);
         ts::return_shared(gateway);
         ts::return_to_address(@0xA, admin_cap);
@@ -54,7 +54,7 @@ fun setup(scenario: &mut Scenario) {
 }
 
 #[test]
-fun test_register_deposit_withdraw() {
+fun test_whitelist_deposit_withdraw() {
     let mut scenario = ts::begin(@0xA);
     setup(&mut scenario);
 
@@ -114,8 +114,8 @@ fun test_fake_usdc_coin() {
     {
          let mut  gateway = scenario.take_shared<Gateway>();
          let admin_cap = ts::take_from_address<AdminCap>( &scenario, @0xA);
-         register_vault<FAKE_USDC>(&mut gateway, &admin_cap);
-         let b = is_registered<FAKE_USDC>(&gateway);
+         whitelist<FAKE_USDC>(&mut gateway, &admin_cap);
+         let b = is_whitelisted<FAKE_USDC>(&gateway);
          assert!(b);
          ts::return_shared(gateway);
          ts::return_to_address(@0xA, admin_cap);
