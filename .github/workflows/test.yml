@@ -14,10 +14,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Cargo
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Update Cargo
+        run: rustup update stable
+
       - name: Install Sui CLI
         run: |
-          curl -fsSL https://install.sui.io | sh
-          echo "$HOME/.sui/bin" >> $GITHUB_PATH
+          cargo install --git https://github.com/MystenLabs/sui.git --bin sui --branch mainnet
 
       - name: Verify Sui installation
         run: sui --version
