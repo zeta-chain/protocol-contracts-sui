@@ -1,4 +1,4 @@
-module gateway_sui::fake_usdc;
+module gateway::fake_usdc;
 
 use sui::coin::{Self};
 
