@@ -13,8 +13,7 @@ use gateway::gateway::{
     ENonceMismatch
 };
 use sui::coin::{Self, Coin};
-
-// use gateway::fake_usdc::{FAKE_USDC, init_for_testing as init_fake_usdc};
+use gateway::fake_usdc::{FAKE_USDC, init_for_testing as init_fake_usdc};
 
 #[test_only]
 use sui::sui::SUI;
@@ -101,46 +100,46 @@ fun test_withdraw_wrong_nonce() {
     ts::end(scenario);
 }
 
-// #[test]
-// fun test_fake_usdc_coin() {
-//     let mut scenario = ts::begin(@0xA);
-//     ts::next_tx(&mut scenario, @0xA);
-//     {
-//         init_for_testing(scenario.ctx());
-//         init_fake_usdc(scenario.ctx());
-//     };
+#[test]
+fun test_fake_usdc_coin() {
+    let mut scenario = ts::begin(@0xA);
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        init_for_testing(scenario.ctx());
+        init_fake_usdc(scenario.ctx());
+    };
 
-//     ts::next_tx(&mut scenario, @0xA);
-//     {
-//          let mut  gateway = scenario.take_shared<Gateway>();
-//          let admin_cap = ts::take_from_address<AdminCap>( &scenario, @0xA);
-//          register_vault<FAKE_USDC>(&mut gateway, &admin_cap);
-//          let b = is_registered<FAKE_USDC>(&gateway);
-//          assert!(b);
-//          ts::return_shared(gateway);
-//          ts::return_to_address(@0xA, admin_cap);
-//     };
-//     ts::next_tx(&mut scenario, @0xA);
-//     {
-//         let mut gateway = scenario.take_shared<Gateway>();
-//         // ts::take_from_address< sui::coin::TreasuryCap<gateway::fake_usdc::FAKE_USDC>>(&scenario, @0xA);
-//         let coin = coin::mint_for_testing<FAKE_USDC>(42, scenario.ctx());
-//         assert!(coin::value(&coin) == 42);
+    ts::next_tx(&mut scenario, @0xA);
+    {
+         let mut  gateway = scenario.take_shared<Gateway>();
+         let admin_cap = ts::take_from_address<AdminCap>( &scenario, @0xA);
+         register_vault<FAKE_USDC>(&mut gateway, &admin_cap);
+         let b = is_registered<FAKE_USDC>(&gateway);
+         assert!(b);
+         ts::return_shared(gateway);
+         ts::return_to_address(@0xA, admin_cap);
+    };
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        // ts::take_from_address< sui::coin::TreasuryCap<gateway::fake_usdc::FAKE_USDC>>(&scenario, @0xA);
+        let coin = coin::mint_for_testing<FAKE_USDC>(42, scenario.ctx());
+        assert!(coin::value(&coin) == 42);
 
-//         let ethAddr = b"0x7c125C1d515b8945841b3d5144a060115C58725F".to_string().to_ascii();
-//         deposit(&mut gateway, coin, ethAddr, scenario.ctx());
-//         ts::return_shared(gateway);
-//     };
-//     ts::next_tx(&mut scenario, @0xA);
-//     {
-//          let mut gateway = scenario.take_shared<Gateway>();
-//          let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
-//          let nonce = gateway.nonce();
-//          let coins = withdraw<FAKE_USDC>(&mut gateway, 13, nonce, &cap, scenario.ctx());
-//          assert!(coin::value(&coins) == 13);
-//          ts::return_to_address(@0xA, cap);
-//          ts::return_shared(gateway);
-//          transfer::public_transfer(coins, @0xA);
-//     };
-//     ts::end(scenario);
-// }
+        let ethAddr = b"0x7c125C1d515b8945841b3d5144a060115C58725F".to_string().to_ascii();
+        deposit(&mut gateway, coin, ethAddr, scenario.ctx());
+        ts::return_shared(gateway);
+    };
+    ts::next_tx(&mut scenario, @0xA);
+    {
+         let mut gateway = scenario.take_shared<Gateway>();
+         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+         let nonce = gateway.nonce();
+         let coins = withdraw_impl<FAKE_USDC>(&mut gateway, 13, nonce, &cap, scenario.ctx());
+         assert!(coin::value(&coins) == 13);
+         ts::return_to_address(@0xA, cap);
+         ts::return_shared(gateway);
+         transfer::public_transfer(coins, @0xA);
+    };
+    ts::end(scenario);
+}

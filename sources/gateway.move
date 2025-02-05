@@ -127,20 +127,6 @@ public fun withdraw_impl<T>(
     coin_out
 }
 
-// === View Functions ===
-
-public fun nonce(gateway: &Gateway): u64 {
-    gateway.nonce
-}
-
-public fun get_vault_balance<T>(gateway: &Gateway): u64 {
-    let vault_registered = is_registered<T>(gateway);
-    assert!(vault_registered, EVaultNotRegistered);
-    let coin_name = get_coin_name<T>();
-    let vault = bag::borrow<String, Vault<T>>(&gateway.vaults, coin_name);
-    balance::value(&vault.balance)
-}
-
 // === Admin Functions ===
 
 // register_vault registers a new vault for a specific coin type
