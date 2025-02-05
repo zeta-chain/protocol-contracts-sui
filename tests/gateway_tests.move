@@ -1,20 +1,24 @@
 #[test_only]
 module gateway::gateway_tests;
 
+use gateway::fake_usdc::{FAKE_USDC, init_for_testing as init_fake_usdc};
 use gateway::gateway::{
     Gateway,
-    register_vault,
-    deposit,
+    whitelist,
+    deposit_impl,
+    deposit_and_call_impl,
     withdraw_impl,
-    is_registered,
+    is_whitelisted,
     WithdrawCap,
     AdminCap,
     init_for_testing,
-    ENonceMismatch
+    ENonceMismatch,
+    get_vault_balance
 };
 use sui::coin::{Self, Coin};
 
-use gateway::fake_usdc::{FAKE_USDC, init_for_testing as init_fake_usdc};
+#[test_only]
+const AmountTest: u64 = 42;
 
 #[test_only]
 use sui::sui::SUI;
@@ -22,7 +26,7 @@ use sui::sui::SUI;
 use sui::test_scenario::{Self as ts, Scenario};
 #[test_only]
 fun test_coin(ts: &mut Scenario): Coin<SUI> {
-    coin::mint_for_testing<SUI>(42, ts.ctx())
+    coin::mint_for_testing<SUI>(AmountTest, ts.ctx())
 }
 
 #[test_only]
@@ -33,28 +37,56 @@ fun setup(scenario: &mut Scenario) {
     };
     ts::next_tx(scenario, @0xA);
     {
+        // create gateway and whitelist SUI
         let mut gateway = scenario.take_shared<Gateway>();
         let admin_cap = ts::take_from_address<AdminCap>(scenario, @0xA);
-        register_vault<SUI>(&mut gateway, &admin_cap);
-        let b = is_registered<SUI>(&gateway);
-        assert!(b);
+        whitelist<SUI>(&mut gateway, &admin_cap);
+        assert!(is_whitelisted<SUI>(&gateway));
         ts::return_shared(gateway);
         ts::return_to_address(@0xA, admin_cap);
     };
 
     ts::next_tx(scenario, @0xB);
     {
+        // deposit SUI
         let mut gateway = scenario.take_shared<Gateway>();
+
         // create some test coin
         let coin = test_coin(scenario);
         let ethAddr = b"0x7c125C1d515b8945841b3d5144a060115C58725F".to_string().to_ascii();
-        deposit(&mut gateway, coin, ethAddr, scenario.ctx());
+        deposit_impl(&mut gateway, coin, ethAddr, scenario.ctx());
+        assert!(get_vault_balance<SUI>(&gateway) == AmountTest);
+
         ts::return_shared(gateway);
     };
 }
 
 #[test]
-fun test_register_deposit_withdraw() {
+fun test_deposit_and_call() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+
+        let coin = test_coin(&mut scenario);
+        let ethAddr = b"0x7c125C1d515b8945841b3d5144a060115C58725F".to_string().to_ascii();
+
+        let balance_before = get_vault_balance<SUI>(&gateway);
+
+        deposit_and_call_impl(&mut gateway, coin, ethAddr, b"hello", scenario.ctx());
+
+        let balance_after = get_vault_balance<SUI>(&gateway);
+        assert!(balance_after == balance_before + AmountTest);
+
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test]
+fun test_whitelist_deposit_withdraw() {
     let mut scenario = ts::begin(@0xA);
     setup(&mut scenario);
 
@@ -112,35 +144,37 @@ fun test_fake_usdc_coin() {
 
     ts::next_tx(&mut scenario, @0xA);
     {
-         let mut  gateway = scenario.take_shared<Gateway>();
-         let admin_cap = ts::take_from_address<AdminCap>( &scenario, @0xA);
-         register_vault<FAKE_USDC>(&mut gateway, &admin_cap);
-         let b = is_registered<FAKE_USDC>(&gateway);
-         assert!(b);
-         ts::return_shared(gateway);
-         ts::return_to_address(@0xA, admin_cap);
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        whitelist<FAKE_USDC>(&mut gateway, &admin_cap);
+        let b = is_whitelisted<FAKE_USDC>(&gateway);
+        assert!(b);
+        ts::return_shared(gateway);
+        ts::return_to_address(@0xA, admin_cap);
     };
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut gateway = scenario.take_shared<Gateway>();
         // ts::take_from_address< sui::coin::TreasuryCap<gateway::fake_usdc::FAKE_USDC>>(&scenario, @0xA);
-        let coin = coin::mint_for_testing<FAKE_USDC>(42, scenario.ctx());
-        assert!(coin::value(&coin) == 42);
+        let coin = coin::mint_for_testing<FAKE_USDC>(AmountTest, scenario.ctx());
+        assert!(coin::value(&coin) == AmountTest);
 
         let ethAddr = b"0x7c125C1d515b8945841b3d5144a060115C58725F".to_string().to_ascii();
-        deposit(&mut gateway, coin, ethAddr, scenario.ctx());
+        deposit_impl(&mut gateway, coin, ethAddr, scenario.ctx());
+        assert!(get_vault_balance<FAKE_USDC>(&gateway) == AmountTest);
+
         ts::return_shared(gateway);
     };
     ts::next_tx(&mut scenario, @0xA);
     {
-         let mut gateway = scenario.take_shared<Gateway>();
-         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
-         let nonce = gateway.nonce();
-         let coins = withdraw_impl<FAKE_USDC>(&mut gateway, 13, nonce, &cap, scenario.ctx());
-         assert!(coin::value(&coins) == 13);
-         ts::return_to_address(@0xA, cap);
-         ts::return_shared(gateway);
-         transfer::public_transfer(coins, @0xA);
+        let mut gateway = scenario.take_shared<Gateway>();
+        let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+        let nonce = gateway.nonce();
+        let coins = withdraw_impl<FAKE_USDC>(&mut gateway, 13, nonce, &cap, scenario.ctx());
+        assert!(coin::value(&coins) == 13);
+        ts::return_to_address(@0xA, cap);
+        ts::return_shared(gateway);
+        transfer::public_transfer(coins, @0xA);
     };
     ts::end(scenario);
 }
