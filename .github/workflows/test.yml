@@ -21,8 +21,7 @@ jobs:
         run: rustup update stable
 
       - name: Install Sui CLI
-        run: |
-          cargo install --git https://github.com/MystenLabs/sui.git --bin sui --branch mainnet
+        run: cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui --features tracing
 
       - name: Verify Sui installation
         run: sui --version
