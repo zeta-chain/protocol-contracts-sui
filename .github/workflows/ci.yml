@@ -1,0 +1,34 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+env:
+  SUI_IMAGE: ghcr.io/zeta-chain/sui-docker@sha256:0741082009ef5034cbb4a3e43215b1a37719a5a16f532e150a83add54a34316c
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: sui move test
+        run: docker run -i -v $(pwd):/sui $SUI_IMAGE sui move test
+
+  ci-ok:
+    runs-on: ubuntu-22.04
+    needs:
+      - unit-test
+    if: ${{ !cancelled() }}
+    steps:
+      - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "One of the jobs failed or was cancelled"
+          exit 1
