@@ -13,8 +13,10 @@ const EAlreadyWhitelisted: u64 = 0;
 const EInvalidReceiverAddress: u64 = 1;
 const ENotWhitelisted: u64 = 2;
 const ENonceMismatch: u64 = 3;
+const EPayloadTooLong: u64 = 4;
 
 const ReceiverAddressLength: u64 = 42;
+const PayloadMaxLength: u64 = 1024;
 
 // === Structs ===
 
@@ -50,6 +52,17 @@ public struct DepositEvent has copy, drop {
     receiver: String, // 0x hex address
 }
 
+// DepositAndCallEvent is emitted when a user deposits tokens into the gateway with a call
+public struct DepositAndCallEvent has copy, drop {
+    coin_type: String,
+    amount: u64,
+    sender: address,
+    receiver: String, // 0x hex address
+    payload: vector<u8>,
+}
+
+// === Initialization ===
+
 fun init(ctx: &mut TxContext) {
     let gateway = Gateway {
         id: object::new(ctx),
@@ -74,16 +87,31 @@ fun init(ctx: &mut TxContext) {
 // === Deposit Functions ===
 
 // deposit allows the user to deposit tokens into the gateway
-public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ctx: &mut TxContext) {
-    assert!(receiver.length() == ReceiverAddressLength, EInvalidReceiverAddress);
-    assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
+entry fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ctx: &mut TxContext) {
+    deposit_impl(gateway, coin, receiver, ctx)
+}
 
-    // Deposit the coin into the vault
+// deposit_and_call allows the user to deposit tokens into the gateway and call a contract
+entry fun deposit_and_call<T>(
+    gateway: &mut Gateway,
+    coin: Coin<T>,
+    receiver: String,
+    payload: vector<u8>,
+    ctx: &mut TxContext,
+) {
+    deposit_and_call_impl(gateway, coin, receiver, payload, ctx)
+}
+
+public fun deposit_impl<T>(
+    gateway: &mut Gateway,
+    coin: Coin<T>,
+    receiver: String,
+    ctx: &mut TxContext,
+) {
     let amount = coin.value();
     let coin_name = get_coin_name<T>();
-    let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
-    let coin_balance = coin.into_balance();
-    balance::join(&mut vault.balance, coin_balance);
+
+    check_receiver_and_deposit_to_vault(gateway, coin, receiver);
 
     // Emit deposit event
     event::emit(DepositEvent {
@@ -92,6 +120,41 @@ public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ct
         sender: tx_context::sender(ctx),
         receiver: receiver,
     });
+}
+
+public fun deposit_and_call_impl<T>(
+    gateway: &mut Gateway,
+    coin: Coin<T>,
+    receiver: String,
+    payload: vector<u8>,
+    ctx: &mut TxContext,
+) {
+    assert!(payload.length() <= PayloadMaxLength, EPayloadTooLong);
+
+    let amount = coin.value();
+    let coin_name = get_coin_name<T>();
+
+    check_receiver_and_deposit_to_vault(gateway, coin, receiver);
+
+    // Emit deposit event
+    event::emit(DepositAndCallEvent {
+        coin_type: coin_name,
+        amount: amount,
+        sender: tx_context::sender(ctx),
+        receiver: receiver,
+        payload: payload,
+    });
+}
+
+// check_receiver_and_deposit_to_vault is a helper function that checks the receiver address and deposits the coin
+fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String) {
+    assert!(receiver.length() == ReceiverAddressLength, EInvalidReceiverAddress);
+    assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
+
+    // Deposit the coin into the vault
+    let coin_name = get_coin_name<T>();
+    let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
+    balance::join(&mut vault.balance, coin.into_balance());
 }
 
 // === Withdraw Functions ===
@@ -159,8 +222,6 @@ public fun whitelist<T>(gateway: &mut Gateway, _cap: &AdminCap) {
     };
     bag::add(&mut gateway.vaults, vault_name, vault);
 }
-
-
 
 // === Helpers ===
 

@@ -4,7 +4,7 @@ module gateway::gateway_tests;
 use gateway::gateway::{
     Gateway,
     whitelist,
-    deposit,
+    deposit_impl,
     withdraw_impl,
     is_whitelisted,
     WithdrawCap,
@@ -48,7 +48,7 @@ fun setup(scenario: &mut Scenario) {
         // create some test coin
         let coin = test_coin(scenario);
         let ethAddr = b"0x7c125C1d515b8945841b3d5144a060115C58725F".to_string().to_ascii();
-        deposit(&mut gateway, coin, ethAddr, scenario.ctx());
+        deposit_impl(&mut gateway, coin, ethAddr, scenario.ctx());
         ts::return_shared(gateway);
     };
 }
@@ -128,7 +128,7 @@ fun test_fake_usdc_coin() {
         assert!(coin::value(&coin) == 42);
 
         let ethAddr = b"0x7c125C1d515b8945841b3d5144a060115C58725F".to_string().to_ascii();
-        deposit(&mut gateway, coin, ethAddr, scenario.ctx());
+        deposit_impl(&mut gateway, coin, ethAddr, scenario.ctx());
         ts::return_shared(gateway);
     };
     ts::next_tx(&mut scenario, @0xA);
