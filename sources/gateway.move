@@ -9,12 +9,14 @@ use sui::event;
 
 // === Errors ===
 
-const EVaultAlreadyRegistered: u64 = 0;
+const EAlreadyWhitelisted: u64 = 0;
 const EInvalidReceiverAddress: u64 = 1;
-const EVaultNotRegistered: u64 = 2;
+const ENotWhitelisted: u64 = 2;
 const ENonceMismatch: u64 = 3;
+const EPayloadTooLong: u64 = 4;
 
 const ReceiverAddressLength: u64 = 42;
+const PayloadMaxLength: u64 = 1024;
 
 // === Structs ===
 
@@ -35,7 +37,7 @@ public struct WithdrawCap has key, store {
     id: UID,
 }
 
-// AdminCap is a capability object that allows the caller to register a new vault
+// AdminCap is a capability object that allows the caller to whitelist a new vault
 public struct AdminCap has key, store {
     id: UID,
 }
@@ -49,6 +51,17 @@ public struct DepositEvent has copy, drop {
     sender: address,
     receiver: String, // 0x hex address
 }
+
+// DepositAndCallEvent is emitted when a user deposits tokens into the gateway with a call
+public struct DepositAndCallEvent has copy, drop {
+    coin_type: String,
+    amount: u64,
+    sender: address,
+    receiver: String, // 0x hex address
+    payload: vector<u8>,
+}
+
+// === Initialization ===
 
 fun init(ctx: &mut TxContext) {
     let gateway = Gateway {
@@ -64,7 +77,7 @@ fun init(ctx: &mut TxContext) {
     };
     transfer::transfer(withdraw_cap, tx_context::sender(ctx));
 
-    // to register a new vault, the caller must have the AdminCap
+    // to whitelist a new vault, the caller must have the AdminCap
     let admin_cap = AdminCap {
         id: object::new(ctx),
     };
@@ -74,16 +87,31 @@ fun init(ctx: &mut TxContext) {
 // === Deposit Functions ===
 
 // deposit allows the user to deposit tokens into the gateway
-public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ctx: &mut TxContext) {
-    assert!(receiver.length() == ReceiverAddressLength, EInvalidReceiverAddress);
-    assert!(is_registered<T>(gateway), EVaultNotRegistered);
+entry fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ctx: &mut TxContext) {
+    deposit_impl(gateway, coin, receiver, ctx)
+}
 
-    // Deposit the coin into the vault
+// deposit_and_call allows the user to deposit tokens into the gateway and call a contract
+entry fun deposit_and_call<T>(
+    gateway: &mut Gateway,
+    coin: Coin<T>,
+    receiver: String,
+    payload: vector<u8>,
+    ctx: &mut TxContext,
+) {
+    deposit_and_call_impl(gateway, coin, receiver, payload, ctx)
+}
+
+public fun deposit_impl<T>(
+    gateway: &mut Gateway,
+    coin: Coin<T>,
+    receiver: String,
+    ctx: &mut TxContext,
+) {
     let amount = coin.value();
     let coin_name = get_coin_name<T>();
-    let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
-    let coin_balance = coin.into_balance();
-    balance::join(&mut vault.balance, coin_balance);
+
+    check_receiver_and_deposit_to_vault(gateway, coin, receiver);
 
     // Emit deposit event
     event::emit(DepositEvent {
@@ -92,6 +120,41 @@ public fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ct
         sender: tx_context::sender(ctx),
         receiver: receiver,
     });
+}
+
+public fun deposit_and_call_impl<T>(
+    gateway: &mut Gateway,
+    coin: Coin<T>,
+    receiver: String,
+    payload: vector<u8>,
+    ctx: &mut TxContext,
+) {
+    assert!(payload.length() <= PayloadMaxLength, EPayloadTooLong);
+
+    let amount = coin.value();
+    let coin_name = get_coin_name<T>();
+
+    check_receiver_and_deposit_to_vault(gateway, coin, receiver);
+
+    // Emit deposit event
+    event::emit(DepositAndCallEvent {
+        coin_type: coin_name,
+        amount: amount,
+        sender: tx_context::sender(ctx),
+        receiver: receiver,
+        payload: payload,
+    });
+}
+
+// check_receiver_and_deposit_to_vault is a helper function that checks the receiver address and deposits the coin
+fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String) {
+    assert!(receiver.length() == ReceiverAddressLength, EInvalidReceiverAddress);
+    assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
+
+    // Deposit the coin into the vault
+    let coin_name = get_coin_name<T>();
+    let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
+    balance::join(&mut vault.balance, coin.into_balance());
 }
 
 // === Withdraw Functions ===
@@ -116,7 +179,7 @@ public fun withdraw_impl<T>(
     _cap: &WithdrawCap,
     ctx: &mut TxContext,
 ): Coin<T> {
-    assert!(is_registered<T>(gateway), EVaultNotRegistered);
+    assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
     assert!(nonce == gateway.nonce, ENonceMismatch); // prevent replay
     gateway.nonce = nonce + 1;
 
@@ -134,7 +197,7 @@ public fun nonce(gateway: &Gateway): u64 {
 }
 
 public fun get_vault_balance<T>(gateway: &Gateway): u64 {
-    if (!is_registered<T>(gateway)) {
+    if (!is_whitelisted<T>(gateway)) {
         return 0
     };
     let coin_name = get_coin_name<T>();
@@ -142,22 +205,22 @@ public fun get_vault_balance<T>(gateway: &Gateway): u64 {
     balance::value(&vault.balance)
 }
 
+// is_whitelisted returns true if a given coin type is whitelisted
+public fun is_whitelisted<T>(gateway: &Gateway): bool {
+    let vault_name = get_coin_name<T>();
+    bag::contains_with_type<String, Vault<T>>(&gateway.vaults, vault_name)
+}
+
 // === Admin Functions ===
 
-// register_vault registers a new vault for a specific coin type
-public fun register_vault<T>(gateway: &mut Gateway, _cap: &AdminCap) {
-    assert!(is_registered<T>(gateway) == false, EVaultAlreadyRegistered);
+// whitelist whitelists a new coin by creating a new vault for the coin type
+public fun whitelist<T>(gateway: &mut Gateway, _cap: &AdminCap) {
+    assert!(is_whitelisted<T>(gateway) == false, EAlreadyWhitelisted);
     let vault_name = get_coin_name<T>();
     let vault = Vault<T> {
         balance: balance::zero<T>(),
     };
     bag::add(&mut gateway.vaults, vault_name, vault);
-}
-
-// is_registered returns true if a vault for the given coin type is registered
-public fun is_registered<T>(gateway: &Gateway): bool {
-    let vault_name = get_coin_name<T>();
-    bag::contains_with_type<String, Vault<T>>(&gateway.vaults, vault_name)
 }
 
 // === Helpers ===
