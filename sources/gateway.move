@@ -28,10 +28,17 @@ public struct Gateway has key {
     id: UID,
     vaults: Bag,
     nonce: u64,
+    activeWithdrawCap: ID,
+    activeWhitelistCap: ID,
 }
 
 // WithdrawCap is a capability object that allows the caller to withdraw tokens from the gateway
 public struct WithdrawCap has key, store {
+    id: UID,
+}
+
+// WhitelistCap is a capability object that allows the caller to whitelist a new vault
+public struct WhitelistCap has key, store {
     id: UID,
 }
 
@@ -51,24 +58,34 @@ public struct DepositEvent has copy, drop {
 }
 
 fun init(ctx: &mut TxContext) {
-    let gateway = Gateway {
-        id: object::new(ctx),
-        vaults: bag::new(ctx),
-        nonce: 0,
-    };
-    transfer::share_object(gateway);
-
     // to withdraw tokens from the gateway, the caller must have the WithdrawCap
     let withdraw_cap = WithdrawCap {
         id: object::new(ctx),
     };
-    transfer::transfer(withdraw_cap, tx_context::sender(ctx));
+
+    // to whitelist a new vault, the caller must have the WhitelistCap
+    let whitelist_cap = WhitelistCap {
+        id: object::new(ctx),
+    };
 
     // to register a new vault, the caller must have the AdminCap
     let admin_cap = AdminCap {
         id: object::new(ctx),
     };
+
+    // create and share the gateway object
+    let gateway = Gateway {
+        id: object::new(ctx),
+        vaults: bag::new(ctx),
+        nonce: 0,
+        activeWithdrawCap: object::id(&withdraw_cap),
+        activeWhitelistCap: object::id(&whitelist_cap),
+    };
+
+    transfer::transfer(withdraw_cap, tx_context::sender(ctx));
+    transfer::transfer(whitelist_cap, tx_context::sender(ctx));
     transfer::transfer(admin_cap, tx_context::sender(ctx));
+    transfer::share_object(gateway);
 }
 
 // === Deposit Functions ===
