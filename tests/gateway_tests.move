@@ -13,6 +13,7 @@ use gateway::gateway::{
     ENonceMismatch
 };
 use sui::coin::{Self, Coin};
+
 use gateway::fake_usdc::{FAKE_USDC, init_for_testing as init_fake_usdc};
 
 #[test_only]
