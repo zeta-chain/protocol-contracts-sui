@@ -4,13 +4,13 @@ module gateway::gateway_tests;
 use gateway::fake_usdc::{FAKE_USDC, init_for_testing as init_fake_usdc};
 use gateway::gateway::{
     Gateway,
-    whitelist,
+    whitelist_impl,
     deposit_impl,
     deposit_and_call_impl,
     withdraw_impl,
     is_whitelisted,
     WithdrawCap,
-    AdminCap,
+    WhitelistCap,
     init_for_testing,
     ENonceMismatch,
     get_vault_balance
@@ -39,11 +39,11 @@ fun setup(scenario: &mut Scenario) {
     {
         // create gateway and whitelist SUI
         let mut gateway = scenario.take_shared<Gateway>();
-        let admin_cap = ts::take_from_address<AdminCap>(scenario, @0xA);
-        whitelist<SUI>(&mut gateway, &admin_cap);
+        let whitelist_cap = ts::take_from_address<WhitelistCap>(scenario, @0xA);
+        whitelist_impl<SUI>(&mut gateway, &whitelist_cap);
         assert!(is_whitelisted<SUI>(&gateway));
         ts::return_shared(gateway);
-        ts::return_to_address(@0xA, admin_cap);
+        ts::return_to_address(@0xA, whitelist_cap);
     };
 
     ts::next_tx(scenario, @0xB);
@@ -145,12 +145,12 @@ fun test_fake_usdc_coin() {
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut gateway = scenario.take_shared<Gateway>();
-        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
-        whitelist<FAKE_USDC>(&mut gateway, &admin_cap);
+        let whitelist_cap = ts::take_from_address<WhitelistCap>(&scenario, @0xA);
+        whitelist_impl<FAKE_USDC>(&mut gateway, &whitelist_cap);
         let b = is_whitelisted<FAKE_USDC>(&gateway);
         assert!(b);
         ts::return_shared(gateway);
-        ts::return_to_address(@0xA, admin_cap);
+        ts::return_to_address(@0xA, whitelist_cap);
     };
     ts::next_tx(&mut scenario, @0xA);
     {

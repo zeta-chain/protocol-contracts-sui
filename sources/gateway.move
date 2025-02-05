@@ -14,6 +14,8 @@ const EInvalidReceiverAddress: u64 = 1;
 const ENotWhitelisted: u64 = 2;
 const ENonceMismatch: u64 = 3;
 const EPayloadTooLong: u64 = 4;
+const EInactiveWithdrawCap: u64 = 5;
+const EInactiveWhitelistCap: u64 = 6;
 
 const ReceiverAddressLength: u64 = 42;
 const PayloadMaxLength: u64 = 1024;
@@ -39,16 +41,12 @@ public struct WithdrawCap has key, store {
     id: UID,
 }
 
-<<<<<<< HEAD
 // WhitelistCap is a capability object that allows the caller to whitelist a new vault
 public struct WhitelistCap has key, store {
     id: UID,
 }
 
-// AdminCap is a capability object that allows the caller to register a new vault
-=======
-// AdminCap is a capability object that allows the caller to whitelist a new vault
->>>>>>> main
+// AdminCap is a capability object that allows to issue new capabilities
 public struct AdminCap has key, store {
     id: UID,
 }
@@ -105,7 +103,7 @@ fun init(ctx: &mut TxContext) {
     transfer::share_object(gateway);
 }
 
-// === Deposit Functions ===
+// === Entrypoints ===
 
 // deposit allows the user to deposit tokens into the gateway
 entry fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ctx: &mut TxContext) {
@@ -122,6 +120,38 @@ entry fun deposit_and_call<T>(
 ) {
     deposit_and_call_impl(gateway, coin, receiver, payload, ctx)
 }
+
+// withdraw allows the TSS to withdraw tokens from the gateway
+entry fun withdraw<T>(
+    gateway: &mut Gateway,
+    amount: u64,
+    nonce: u64,
+    recipient: address,
+    cap: &WithdrawCap,
+    ctx: &mut TxContext,
+) {
+    let coin = withdraw_impl<T>(gateway, amount, nonce, cap, ctx);
+    transfer::public_transfer(coin, recipient);
+}
+
+// whitelist whitelists a new coin by creating a new vault for the coin type
+entry fun whitelist<T>(gateway: &mut Gateway, _cap: &WhitelistCap) {
+    whitelist_impl<T>(gateway, _cap)
+}
+
+// issue_withdraw_cap issues a new WithdrawCap and revokes the old one
+entry fun issue_withdraw_cap(gateway: &mut Gateway, _cap: &AdminCap, ctx: &mut TxContext) {
+    let withdraw_cap = issue_withdraw_cap_impl(gateway, _cap, ctx);
+    transfer::transfer(withdraw_cap, tx_context::sender(ctx));
+}
+
+// issue_whitelist_cap issues a new Whitelist and revokes the old one
+entry fun issue_whitelist_cap(gateway: &mut Gateway, _cap: &AdminCap, ctx: &mut TxContext) {
+    let whitelist_cap = issue_whitelist_cap_impl(gateway, _cap, ctx);
+    transfer::transfer(whitelist_cap, tx_context::sender(ctx));
+}
+
+// === Deposit Functions ===
 
 public fun deposit_impl<T>(
     gateway: &mut Gateway,
@@ -180,19 +210,6 @@ fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coin: Coin<T>,
 
 // === Withdraw Functions ===
 
-// withdraw allows the TSS to withdraw tokens from the gateway
-entry fun withdraw<T>(
-    gateway: &mut Gateway,
-    amount: u64,
-    nonce: u64,
-    recipient: address,
-    cap: &WithdrawCap,
-    ctx: &mut TxContext,
-) {
-    let coin = withdraw_impl<T>(gateway, amount, nonce, cap, ctx);
-    transfer::public_transfer(coin, recipient);
-}
-
 public fun withdraw_impl<T>(
     gateway: &mut Gateway,
     amount: u64,
@@ -200,6 +217,7 @@ public fun withdraw_impl<T>(
     _cap: &WithdrawCap,
     ctx: &mut TxContext,
 ): Coin<T> {
+    assert!(gateway.activeWithdrawCap == object::id(_cap), EInactiveWithdrawCap);
     assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
     assert!(nonce == gateway.nonce, ENonceMismatch); // prevent replay
     gateway.nonce = nonce + 1;
@@ -234,14 +252,38 @@ public fun is_whitelisted<T>(gateway: &Gateway): bool {
 
 // === Admin Functions ===
 
-// whitelist whitelists a new coin by creating a new vault for the coin type
-public fun whitelist<T>(gateway: &mut Gateway, _cap: &AdminCap) {
+public fun whitelist_impl<T>(gateway: &mut Gateway, _cap: &WhitelistCap) {
+    assert!(gateway.activeWhitelistCap == object::id(_cap), EInactiveWhitelistCap);
     assert!(is_whitelisted<T>(gateway) == false, EAlreadyWhitelisted);
     let vault_name = get_coin_name<T>();
     let vault = Vault<T> {
         balance: balance::zero<T>(),
     };
     bag::add(&mut gateway.vaults, vault_name, vault);
+}
+
+public fun issue_withdraw_cap_impl(
+    gateway: &mut Gateway,
+    _cap: &AdminCap,
+    ctx: &mut TxContext,
+): WithdrawCap {
+    let withdraw_cap = WithdrawCap {
+        id: object::new(ctx),
+    };
+    gateway.activeWithdrawCap = object::id(&withdraw_cap);
+    withdraw_cap
+}
+
+public fun issue_whitelist_cap_impl(
+    gateway: &mut Gateway,
+    _cap: &AdminCap,
+    ctx: &mut TxContext,
+): WhitelistCap {
+    let whitelist_cap = WhitelistCap {
+        id: object::new(ctx),
+    };
+    gateway.activeWhitelistCap = object::id(&whitelist_cap);
+    whitelist_cap
 }
 
 // === Helpers ===
