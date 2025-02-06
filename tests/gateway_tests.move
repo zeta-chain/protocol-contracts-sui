@@ -283,10 +283,10 @@ fun test_issue_withdraw_and_whitelist_cap() {
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut gateway = scenario.take_shared<Gateway>();
-        let adminCap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
         let (withdraw_cap, whitelist_cap) = issue_withdraw_and_whitelist_cap_impl(
             &mut gateway,
-            &adminCap,
+            &admin_cap,
             scenario.ctx(),
         );
         assert!(active_withdraw_cap(&gateway) == object::id(&withdraw_cap));
@@ -302,7 +302,7 @@ fun test_issue_withdraw_and_whitelist_cap() {
 
         transfer::public_freeze_object(withdraw_cap);
         transfer::public_freeze_object(whitelist_cap);
-        ts::return_to_address(@0xA, adminCap);
+        ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
     };
     ts::end(scenario);
@@ -316,12 +316,12 @@ fun test_issue_withdraw_and_whitelist_cap_revoke_withdraw() {
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut gateway = scenario.take_shared<Gateway>();
-        let adminCap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
         let old_withdraw_cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
 
         let (withdraw_cap, whitelist_cap) = issue_withdraw_and_whitelist_cap_impl(
             &mut gateway,
-            &adminCap,
+            &admin_cap,
             scenario.ctx(),
         );
 
@@ -331,7 +331,7 @@ fun test_issue_withdraw_and_whitelist_cap_revoke_withdraw() {
 
         transfer::public_freeze_object(withdraw_cap);
         transfer::public_freeze_object(whitelist_cap);
-        ts::return_to_address(@0xA, adminCap);
+        ts::return_to_address(@0xA, admin_cap);
         ts::return_to_address(@0xA, old_withdraw_cap);
         ts::return_shared(gateway);
     };
@@ -346,19 +346,19 @@ fun test_issue_withdraw_and_whitelist_cap_revoke_whitelist() {
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut gateway = scenario.take_shared<Gateway>();
-        let adminCap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
         let old_whitelist_cap = ts::take_from_address<WhitelistCap>(&scenario, @0xA);
 
         let (withdraw_cap, whitelist_cap) = issue_withdraw_and_whitelist_cap_impl(
             &mut gateway,
-            &adminCap,
+            &admin_cap,
             scenario.ctx(),
         );
         whitelist_impl<FAKE_USDC>(&mut gateway, &old_whitelist_cap);
 
         transfer::public_freeze_object(withdraw_cap);
         transfer::public_freeze_object(whitelist_cap);
-        ts::return_to_address(@0xA, adminCap);
+        ts::return_to_address(@0xA, admin_cap);
         ts::return_to_address(@0xA, old_whitelist_cap);
         ts::return_shared(gateway);
     };
