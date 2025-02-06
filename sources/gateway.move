@@ -16,6 +16,7 @@ const ENonceMismatch: u64 = 3;
 const EPayloadTooLong: u64 = 4;
 const EInactiveWithdrawCap: u64 = 5;
 const EInactiveWhitelistCap: u64 = 6;
+const EDepositPaused: u64 = 7;
 
 const ReceiverAddressLength: u64 = 42;
 const PayloadMaxLength: u64 = 1024;
@@ -34,6 +35,7 @@ public struct Gateway has key {
     nonce: u64,
     active_withdraw_cap: ID,
     active_whitelist_cap: ID,
+    deposit_paused: bool,
 }
 
 // WithdrawCap is a capability object that allows the caller to withdraw tokens from the gateway
@@ -95,6 +97,7 @@ fun init(ctx: &mut TxContext) {
         nonce: 0,
         active_withdraw_cap: object::id(&withdraw_cap),
         active_whitelist_cap: object::id(&whitelist_cap),
+        deposit_paused: false,
     };
 
     transfer::transfer(withdraw_cap, tx_context::sender(ctx));
@@ -140,10 +143,24 @@ entry fun whitelist<T>(gateway: &mut Gateway, _cap: &WhitelistCap) {
 }
 
 // issue_withdraw_and_whitelist_cap issues a new WithdrawCap and WhitelistCap and revokes the old ones
-entry fun issue_withdraw_and_whitelist_cap(gateway: &mut Gateway, _cap: &AdminCap, ctx: &mut TxContext) {
+entry fun issue_withdraw_and_whitelist_cap(
+    gateway: &mut Gateway,
+    _cap: &AdminCap,
+    ctx: &mut TxContext,
+) {
     let (withdraw_cap, whitelist_cap) = issue_withdraw_and_whitelist_cap_impl(gateway, _cap, ctx);
     transfer::transfer(withdraw_cap, tx_context::sender(ctx));
     transfer::transfer(whitelist_cap, tx_context::sender(ctx));
+}
+
+// pause pauses the deposit functionality
+entry fun pause(gateway: &mut Gateway, cap: &AdminCap) {
+    pause_impl(gateway, cap)
+}
+
+// unpause unpauses the deposit functionality
+entry fun unpause(gateway: &mut Gateway, cap: &AdminCap) {
+    unpause_impl(gateway, cap)
 }
 
 // === Deposit Functions ===
@@ -196,6 +213,7 @@ public fun deposit_and_call_impl<T>(
 fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String) {
     assert!(receiver.length() == ReceiverAddressLength, EInvalidReceiverAddress);
     assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
+    assert!(!gateway.deposit_paused, EDepositPaused);
 
     // Deposit the coin into the vault
     let coin_name = coin_name<T>();
@@ -252,6 +270,14 @@ public fun issue_withdraw_and_whitelist_cap_impl(
     (withdraw_cap, whitelist_cap)
 }
 
+public fun pause_impl(gateway: &mut Gateway, _cap: &AdminCap) {
+    gateway.deposit_paused = true;
+}
+
+public fun unpause_impl(gateway: &mut Gateway, _cap: &AdminCap) {
+    gateway.deposit_paused = false;
+}
+
 // === View Functions ===
 
 public fun nonce(gateway: &Gateway): u64 {
@@ -273,6 +299,10 @@ public fun vault_balance<T>(gateway: &Gateway): u64 {
     let coin_name = coin_name<T>();
     let vault = bag::borrow<String, Vault<T>>(&gateway.vaults, coin_name);
     balance::value(&vault.balance)
+}
+
+public fun is_paused(gateway: &Gateway): bool {
+    gateway.deposit_paused
 }
 
 // is_whitelisted returns true if a given coin type is whitelisted

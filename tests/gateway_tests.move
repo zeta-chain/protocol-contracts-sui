@@ -8,6 +8,9 @@ use gateway::gateway::{
     deposit_impl,
     deposit_and_call_impl,
     issue_withdraw_and_whitelist_cap_impl,
+    pause,
+    unpause,
+    is_paused,
     withdraw_impl,
     is_whitelisted,
     vault_balance,
@@ -24,7 +27,8 @@ use gateway::gateway::{
     ENotWhitelisted,
     EInactiveWithdrawCap,
     EInactiveWhitelistCap,
-    EAlreadyWhitelisted
+    EAlreadyWhitelisted,
+    EDepositPaused
 };
 use sui::coin::{Self, Coin};
 
@@ -138,6 +142,28 @@ fun test_deposit_not_whitelisted() {
     ts::end(scenario);
 }
 
+#[test, expected_failure(abort_code = EDepositPaused)]
+fun test_deposit_paused() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        let coin = test_coin(&mut scenario);
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+
+        pause(&mut gateway, &admin_cap);
+        deposit_impl(&mut gateway, coin, eth_addr, scenario.ctx());
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
 #[test, expected_failure(abort_code = EInvalidReceiverAddress)]
 fun test_deposit_and_call_invalid_address() {
     let mut scenario = ts::begin(@0xA);
@@ -171,6 +197,53 @@ fun test_deposit_and_call_not_whitelisted() {
 
         deposit_and_call_impl(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
 
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = EDepositPaused)]
+fun test_deposit_and_call_paused() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        let coin = test_coin(&mut scenario);
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+
+        pause(&mut gateway, &admin_cap);
+        deposit_and_call_impl(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test]
+fun test_pause_and_resume_deposit() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        let coin = test_coin(&mut scenario);
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+
+        pause(&mut gateway, &admin_cap);
+        assert!(is_paused(&gateway));
+        unpause(&mut gateway, &admin_cap);
+        assert!(!is_paused(&gateway));
+        deposit_impl(&mut gateway, coin, eth_addr, scenario.ctx());
+
+        ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
     };
     ts::end(scenario);
