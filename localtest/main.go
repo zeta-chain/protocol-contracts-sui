@@ -123,16 +123,16 @@ func main() {
 	}
 
 	{ // register vault2 from signer2;
-		// first need to transfer the adminCap from signer1 to signer2
+		// first need to transfer the whitelistCap from signer1 to signer2
 		// 	typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
-		typeName := fmt.Sprintf("%s::gateway::AdminCap", moduleId)
-		adminCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
+		typeName := fmt.Sprintf("%s::gateway::WhitelistCap", moduleId)
+		whitelistCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("adminCapId id %s\n", adminCapId)
-		if adminCapId == "" {
-			panic("failed to find WithdrawCap object")
+		fmt.Printf("whitelistCapId id %s\n", whitelistCapId)
+		if whitelistCapId == "" {
+			panic("failed to find whitelistCapId object")
 		}
 
 		s2 := signer2.NewSignerSecp256k1Random()
@@ -142,7 +142,7 @@ func main() {
 		{
 			tx, err := cli.TransferObject(ctx, models.TransferObjectRequest{
 				Signer:    signerAccount.Address,
-				ObjectId:  adminCapId,
+				ObjectId:  whitelistCapId,
 				Recipient: string(s2.Address()),
 				GasBudget: "5000000000",
 			})
@@ -163,9 +163,9 @@ func main() {
 			}
 
 			if resp.Effects.Status.Status != "success" {
-				panic("failed to transfer AdminCap")
+				panic("failed to transfer whitelistCapId")
 			}
-			fmt.Printf("AdminCap transferred to signer2\n")
+			fmt.Printf("whitelistCapId transferred to signer2\n")
 		}
 
 		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
@@ -174,7 +174,7 @@ func main() {
 			Module:          "gateway",
 			Function:        "whitelist",
 			TypeArguments:   []interface{}{"0x2::sui::SUI"},
-			Arguments:       []interface{}{gatewayObjectId, adminCapId},
+			Arguments:       []interface{}{gatewayObjectId, whitelistCapId},
 			GasBudget:       "5000000000",
 		})
 		if err != nil {
