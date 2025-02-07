@@ -5,6 +5,7 @@ use gateway::fake_usdc::{FAKE_USDC, init_for_testing as init_fake_usdc};
 use gateway::gateway::{
     Gateway,
     whitelist_impl,
+    unwhitelist_impl,
     deposit_impl,
     deposit_and_call_impl,
     issue_withdraw_and_whitelist_cap_impl,
@@ -54,23 +55,11 @@ fun setup(scenario: &mut Scenario) {
     {
         init_for_testing(scenario.ctx());
     };
-    ts::next_tx(scenario, @0xA);
-    {
-        // create gateway and whitelist SUI
-        let mut gateway = scenario.take_shared<Gateway>();
-        let whitelist_cap = ts::take_from_address<WhitelistCap>(scenario, @0xA);
-        whitelist_impl<SUI>(&mut gateway, &whitelist_cap);
-        assert!(is_whitelisted<SUI>(&gateway));
-        ts::return_shared(gateway);
-        ts::return_to_address(@0xA, whitelist_cap);
-    };
 
     ts::next_tx(scenario, @0xB);
     {
         // deposit SUI
         let mut gateway = scenario.take_shared<Gateway>();
-
-        // create some test coin
         let coin = test_coin(scenario);
         let eth_addr = ValidEthAddr.to_string().to_ascii();
         deposit_impl(&mut gateway, coin, eth_addr, scenario.ctx());
@@ -267,9 +256,9 @@ fun test_withdraw() {
     };
     ts::next_tx(&mut scenario, @0xA);
     {
+        // check nonce and received coins
         let gateway = scenario.take_shared<Gateway>();
-        assert!(gateway.nonce() == 1); // nonce should be updated
-        // check the received coin on @0xB
+        assert!(gateway.nonce() == 1);
         let coin = ts::take_from_address<Coin<SUI>>(&scenario, @0xA);
         assert!(coin::value(&coin) == 10);
         ts::return_to_address(@0xA, coin);
@@ -439,8 +428,71 @@ fun test_issue_withdraw_and_whitelist_cap_revoke_whitelist() {
 }
 
 #[test]
+fun test_unwhitelist() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        unwhitelist_impl<SUI>(&mut gateway, &cap);
+
+        assert!(!is_whitelisted<SUI>(&gateway));
+
+        ts::return_to_address(@0xA, cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = ENotWhitelisted)]
+fun test_unwhitelist_not_whitelisted() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        unwhitelist_impl<FAKE_USDC>(&mut gateway, &cap);
+
+        ts::return_to_address(@0xA, cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = ENotWhitelisted)]
+fun test_withdraw_not_whitelist() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+
+        // unwhitelist
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        unwhitelist_impl<SUI>(&mut gateway, &admin_cap);
+
+        // try withdraw
+        let withdraw_cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+        let nonce = gateway.nonce();
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &withdraw_cap, scenario.ctx());
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_to_address(@0xA, withdraw_cap);
+        ts::return_shared(gateway);
+        transfer::public_transfer(coins, @0xA);
+    };
+    ts::end(scenario);
+}
+
+#[test]
 fun test_custom_coin() {
     let mut scenario = ts::begin(@0xA);
+
     ts::next_tx(&mut scenario, @0xA);
     {
         init_for_testing(scenario.ctx());
@@ -481,6 +533,52 @@ fun test_custom_coin() {
         let coins = withdraw_impl<FAKE_USDC>(&mut gateway, 13, nonce, &cap, scenario.ctx());
         assert!(coin::value(&coins) == 13);
         ts::return_to_address(@0xA, cap);
+        ts::return_shared(gateway);
+        transfer::public_transfer(coins, @0xA);
+    };
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        // can unwhitelist FAKE_USDC and still withdraw SUI
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        let withdraw_cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+
+        unwhitelist_impl<FAKE_USDC>(&mut gateway, &admin_cap);
+
+        let sui_coin = test_coin(&mut scenario);
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+        deposit_impl(&mut gateway, sui_coin, eth_addr, scenario.ctx());
+
+        let nonce = gateway.nonce();
+        let coins = withdraw_impl<SUI>(&mut gateway, 13, nonce, &withdraw_cap, scenario.ctx());
+        assert!(coin::value(&coins) == 13);
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_to_address(@0xA, withdraw_cap);
+        ts::return_shared(gateway);
+        transfer::public_transfer(coins, @0xA);
+    };
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        // can re-whitelist and withdraw FAKE_USDC
+        let mut gateway = scenario.take_shared<Gateway>();
+        let whitelist_cap = ts::take_from_address<WhitelistCap>(&scenario, @0xA);
+        let withdraw_cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+
+        whitelist_impl<FAKE_USDC>(&mut gateway, &whitelist_cap);
+
+        let nonce = gateway.nonce();
+        let coins = withdraw_impl<FAKE_USDC>(
+            &mut gateway,
+            13,
+            nonce,
+            &withdraw_cap,
+            scenario.ctx(),
+        );
+        assert!(coin::value(&coins) == 13);
+
+        ts::return_to_address(@0xA, whitelist_cap);
+        ts::return_to_address(@0xA, withdraw_cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
     };

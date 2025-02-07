@@ -12,8 +12,6 @@ import (
 	"github.com/block-vision/sui-go-sdk/signer"
 	"github.com/block-vision/sui-go-sdk/sui"
 	"github.com/block-vision/sui-go-sdk/utils"
-
-	signer2 "github.com/brewmaster012/sui-gateway/signer"
 )
 
 //go:embed gateway.mv
@@ -122,82 +120,83 @@ func main() {
 		panic("failed to create gateway object")
 	}
 
-	{ // register vault2 from signer2;
-		// first need to transfer the whitelistCap from signer1 to signer2
-		// 	typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
-		typeName := fmt.Sprintf("%s::gateway::WhitelistCap", moduleId)
-		whitelistCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("whitelistCapId id %s\n", whitelistCapId)
-		if whitelistCapId == "" {
-			panic("failed to find whitelistCapId object")
-		}
+	// Note: SUI is now whitelisted by default
+	// { // register vault2 from signer2;
+	// 	// first need to transfer the whitelistCap from signer1 to signer2
+	// 	// 	typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
+	// 	typeName := fmt.Sprintf("%s::gateway::WhitelistCap", moduleId)
+	// 	whitelistCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	fmt.Printf("whitelistCapId id %s\n", whitelistCapId)
+	// 	if whitelistCapId == "" {
+	// 		panic("failed to find whitelistCapId object")
+	// 	}
 
-		s2 := signer2.NewSignerSecp256k1Random()
-		fmt.Printf("signer2 address: %s\n", s2.Address())
-		RequestLocalNetSuiFromFaucet(string(s2.Address()))
+	// 	s2 := signer2.NewSignerSecp256k1Random()
+	// 	fmt.Printf("signer2 address: %s\n", s2.Address())
+	// 	RequestLocalNetSuiFromFaucet(string(s2.Address()))
 
-		{
-			tx, err := cli.TransferObject(ctx, models.TransferObjectRequest{
-				Signer:    signerAccount.Address,
-				ObjectId:  whitelistCapId,
-				Recipient: string(s2.Address()),
-				GasBudget: "5000000000",
-			})
-			if err != nil {
-				panic(err)
-			}
+	// 	{
+	// 		tx, err := cli.TransferObject(ctx, models.TransferObjectRequest{
+	// 			Signer:    signerAccount.Address,
+	// 			ObjectId:  whitelistCapId,
+	// 			Recipient: string(s2.Address()),
+	// 			GasBudget: "5000000000",
+	// 		})
+	// 		if err != nil {
+	// 			panic(err)
+	// 		}
 
-			resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
-				TxnMetaData: tx,
-				PriKey:      signerAccount.PriKey,
-				Options: models.SuiTransactionBlockOptions{
-					ShowEffects: true,
-				},
-				RequestType: "WaitForLocalExecution",
-			})
-			if err != nil {
-				panic(err)
-			}
+	// 		resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
+	// 			TxnMetaData: tx,
+	// 			PriKey:      signerAccount.PriKey,
+	// 			Options: models.SuiTransactionBlockOptions{
+	// 				ShowEffects: true,
+	// 			},
+	// 			RequestType: "WaitForLocalExecution",
+	// 		})
+	// 		if err != nil {
+	// 			panic(err)
+	// 		}
 
-			if resp.Effects.Status.Status != "success" {
-				panic("failed to transfer whitelistCapId")
-			}
-			fmt.Printf("whitelistCapId transferred to signer2\n")
-		}
+	// 		if resp.Effects.Status.Status != "success" {
+	// 			panic("failed to transfer whitelistCapId")
+	// 		}
+	// 		fmt.Printf("whitelistCapId transferred to signer2\n")
+	// 	}
 
-		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
-			Signer:          string(s2.Address()),
-			PackageObjectId: moduleId,
-			Module:          "gateway",
-			Function:        "whitelist",
-			TypeArguments:   []interface{}{"0x2::sui::SUI"},
-			Arguments:       []interface{}{gatewayObjectId, whitelistCapId},
-			GasBudget:       "5000000000",
-		})
-		if err != nil {
-			panic(err)
-		}
-		resp, err := s2.SignAndExecuteTransactionBlock(ctx, cli, models.SignAndExecuteTransactionBlockRequest{
-			TxnMetaData: tx,
-			PriKey:      signerAccount.PriKey, // this one is not used as it's ed25119, just for compat
-			Options: models.SuiTransactionBlockOptions{
-				ShowEffects: true,
-			},
-			RequestType: "WaitForLocalExecution",
-		})
-		if err != nil {
-			panic(err)
-		}
-		// check status of tx
-		if resp.Effects.Status.Status != "success" {
-			panic("failed to register vault")
-		}
-		fmt.Printf("SUI vault registered\n")
-		// utils.PrettyPrint(resp)
-	}
+	// 	tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
+	// 		Signer:          string(s2.Address()),
+	// 		PackageObjectId: moduleId,
+	// 		Module:          "gateway",
+	// 		Function:        "whitelist",
+	// 		TypeArguments:   []interface{}{"0x2::sui::SUI"},
+	// 		Arguments:       []interface{}{gatewayObjectId, whitelistCapId},
+	// 		GasBudget:       "5000000000",
+	// 	})
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	resp, err := s2.SignAndExecuteTransactionBlock(ctx, cli, models.SignAndExecuteTransactionBlockRequest{
+	// 		TxnMetaData: tx,
+	// 		PriKey:      signerAccount.PriKey, // this one is not used as it's ed25119, just for compat
+	// 		Options: models.SuiTransactionBlockOptions{
+	// 			ShowEffects: true,
+	// 		},
+	// 		RequestType: "WaitForLocalExecution",
+	// 	})
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	// check status of tx
+	// 	if resp.Effects.Status.Status != "success" {
+	// 		panic("failed to register vault")
+	// 	}
+	// 	fmt.Printf("SUI vault registered\n")
+	// 	// utils.PrettyPrint(resp)
+	// }
 
 	// Deposit SUI
 	{

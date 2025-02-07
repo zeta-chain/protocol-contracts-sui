@@ -6,6 +6,7 @@ use sui::bag::{Self, Bag};
 use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin};
 use sui::event;
+use sui::sui::SUI;
 
 // === Errors ===
 
@@ -26,6 +27,7 @@ const PayloadMaxLength: u64 = 1024;
 // Vault stores the balance of a specific coin type
 public struct Vault<phantom T> has store {
     balance: Balance<T>,
+    whitelisted: bool,
 }
 
 // Gateway stores the vaults and the nonce for withdrawals
@@ -91,7 +93,7 @@ fun init(ctx: &mut TxContext) {
     };
 
     // create and share the gateway object
-    let gateway = Gateway {
+    let mut gateway = Gateway {
         id: object::new(ctx),
         vaults: bag::new(ctx),
         nonce: 0,
@@ -99,6 +101,9 @@ fun init(ctx: &mut TxContext) {
         active_whitelist_cap: object::id(&whitelist_cap),
         deposit_paused: false,
     };
+
+    // whitelist SUI by default
+    whitelist_impl<SUI>(&mut gateway, &whitelist_cap);
 
     transfer::transfer(withdraw_cap, tx_context::sender(ctx));
     transfer::transfer(whitelist_cap, tx_context::sender(ctx));
@@ -138,8 +143,13 @@ entry fun withdraw<T>(
 }
 
 // whitelist whitelists a new coin by creating a new vault for the coin type
-entry fun whitelist<T>(gateway: &mut Gateway, _cap: &WhitelistCap) {
-    whitelist_impl<T>(gateway, _cap)
+entry fun whitelist<T>(gateway: &mut Gateway, cap: &WhitelistCap) {
+    whitelist_impl<T>(gateway, cap)
+}
+
+// unwhitelist unwhitelists a coin by setting the whitelisted flag to false
+entry fun unwhitelist<T>(gateway: &mut Gateway, cap: &AdminCap) {
+    unwhitelist_impl<T>(gateway, cap)
 }
 
 // issue_withdraw_and_whitelist_cap issues a new WithdrawCap and WhitelistCap and revokes the old ones
@@ -247,11 +257,25 @@ public fun withdraw_impl<T>(
 public fun whitelist_impl<T>(gateway: &mut Gateway, cap: &WhitelistCap) {
     assert!(gateway.active_whitelist_cap == object::id(cap), EInactiveWhitelistCap);
     assert!(is_whitelisted<T>(gateway) == false, EAlreadyWhitelisted);
-    let vault_name = coin_name<T>();
-    let vault = Vault<T> {
-        balance: balance::zero<T>(),
-    };
-    bag::add(&mut gateway.vaults, vault_name, vault);
+
+    // if the vault already exists, set it to whitelisted, otherwise create a new vault
+    if (bag::contains_with_type<String, Vault<T>>(&gateway.vaults, coin_name<T>())) {
+        let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name<T>());
+        vault.whitelisted = true;
+    } else {
+        let vault_name = coin_name<T>();
+        let vault = Vault<T> {
+            balance: balance::zero<T>(),
+            whitelisted: true,
+        };
+        bag::add(&mut gateway.vaults, vault_name, vault);
+    }
+}
+
+public fun unwhitelist_impl<T>(gateway: &mut Gateway, _cap: &AdminCap) {
+    assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
+    let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name<T>());
+    vault.whitelisted = false;
 }
 
 public fun issue_withdraw_and_whitelist_cap_impl(
@@ -308,7 +332,11 @@ public fun is_paused(gateway: &Gateway): bool {
 // is_whitelisted returns true if a given coin type is whitelisted
 public fun is_whitelisted<T>(gateway: &Gateway): bool {
     let vault_name = coin_name<T>();
-    bag::contains_with_type<String, Vault<T>>(&gateway.vaults, vault_name)
+    if (!bag::contains_with_type<String, Vault<T>>(&gateway.vaults, vault_name)) {
+        return false
+    };
+    let vault = bag::borrow<String, Vault<T>>(&gateway.vaults, vault_name);
+    vault.whitelisted
 }
 
 // === Helpers ===

@@ -1,2 +1,3 @@
 build/*
 localtest/gateway.mv
+.DS_Store
