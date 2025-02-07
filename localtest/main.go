@@ -12,6 +12,12 @@ import (
 	"github.com/block-vision/sui-go-sdk/signer"
 	"github.com/block-vision/sui-go-sdk/sui"
 	"github.com/block-vision/sui-go-sdk/utils"
+	"github.com/davecgh/go-spew/spew"
+	sui2 "github.com/pattonkan/sui-go/sui"
+	"github.com/pattonkan/sui-go/sui/suiptb"
+	"github.com/pattonkan/sui-go/suiclient"
+
+	"github.com/fardream/go-bcs/bcs"
 
 	signer2 "github.com/brewmaster012/sui-gateway/signer"
 )
@@ -266,7 +272,7 @@ func main() {
 			Signer:          signerAccount.Address,
 			PackageObjectId: moduleId,
 			Module:          "gateway",
-			Function:        "withdraw_to_address",
+			Function:        "withdraw",
 			TypeArguments:   []interface{}{"0x2::sui::SUI"},
 			Arguments:       []interface{}{gatewayObjectId, amt, nonce, bob, withdrawCapId},
 			GasBudget:       "5000000000",
@@ -274,6 +280,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
+		utils.PrettyPrint("withdraw tx")
+		utils.PrettyPrint(tx)
+		spew.Dump(tx)
 
 		resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
 			TxnMetaData: tx,
@@ -300,6 +310,53 @@ func main() {
 				}
 			}
 		}
+	}
+	{
+		// acquire the WithdrawCap object first
+		typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
+		withdrawCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("withdrawcap id %s\n", withdrawCapId)
+		if withdrawCapId == "" {
+			panic("failed to find WithdrawCap object")
+		}
+		withdrawCap := sui2.MustObjectIdFromHex(withdrawCapId)
+
+		//PTB withdraw + transfer
+		client := suiclient.NewClient("http://localhost:9000")
+		ptb := suiptb.NewTransactionDataTransactionBuilder()
+		packId := sui2.MustPackageIdFromHex(moduleId)
+		//tag, _ := sui2.StructTagFromString()
+		tag := sui2.MustNewTypeTag("0x2::sui::SUI")
+		//withdrawCapObjId := sui2.MustObjectIdFromHex(adminCap)
+		client.GetObject(context.Background(), &suiclient.GetObjectRequest{
+			ObjectId: withdrawCap,
+		})
+
+		ptb.Command(suiptb.Command{
+			MoveCall: &suiptb.ProgrammableMoveCall{
+				Package:       packId,
+				Module:        "gateway",
+				Function:      "withdraw_impl",
+				TypeArguments: []sui2.TypeTag{*tag},
+				Arguments:     []suiptb.Argument{},
+			},
+		})
+		ptb.Finish()
+		pt := ptb.Finish()
+		addr, _ := sui2.AddressFromHex(signerAccount.Address)
+		txData := suiptb.NewTransactionData(
+			addr,
+			pt,
+			[]*sui2.ObjectRef{coins[0].Ref()},
+			suiclient.DefaultGasBudget,
+			suiclient.DefaultGasPrice,
+		)
+		bcs.Marshal(txData)
+
+		client.DryRunTransaction()
 	}
 
 	fmt.Printf("Success!\n")
