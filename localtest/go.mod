@@ -1,12 +1,15 @@
 module github.com/brewmaster012/sui-gateway
 
-go 1.22.5
+go 1.23
+
+toolchain go1.23.2
 
 require (
 	github.com/block-vision/sui-go-sdk v1.0.6
 	github.com/davecgh/go-spew v1.1.1
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 	github.com/ethereum/go-ethereum v1.14.13
+	github.com/fardream/go-bcs v0.7.0
 	github.com/pattonkan/sui-go v0.1.0
 	golang.org/x/crypto v0.25.0
 
@@ -14,7 +17,6 @@ require (
 
 require (
 	github.com/btcsuite/btcutil v1.0.2 // indirect
-	github.com/fardream/go-bcs v0.7.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.12.0 // indirect
@@ -31,3 +33,5 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 )
+
+replace github.com/pattonkan/sui-go => github.com/brewmaster012/sui-go v0.0.0-20250211234121-5526cf5c4628

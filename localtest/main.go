@@ -12,14 +12,12 @@ import (
 	"github.com/block-vision/sui-go-sdk/signer"
 	"github.com/block-vision/sui-go-sdk/sui"
 	"github.com/block-vision/sui-go-sdk/utils"
-	"github.com/davecgh/go-spew/spew"
+	signer2 "github.com/brewmaster012/sui-gateway/signer"
+	"github.com/fardream/go-bcs/bcs"
 	sui2 "github.com/pattonkan/sui-go/sui"
 	"github.com/pattonkan/sui-go/sui/suiptb"
 	"github.com/pattonkan/sui-go/suiclient"
-
-	"github.com/fardream/go-bcs/bcs"
-
-	signer2 "github.com/brewmaster012/sui-gateway/signer"
+	"github.com/pattonkan/sui-go/suisigner"
 )
 
 //go:embed gateway.mv
@@ -79,6 +77,7 @@ func main() {
 	gatewayBase64 := base64.StdEncoding.EncodeToString(gatewayBinary)
 	fmt.Printf("gatewayBase64 len %d\n", len(gatewayBase64))
 	var gatewayObjectId string
+	var gatewayObjectInitialSharedVersion string
 	{
 		tx, err := cli.Publish(ctx, models.PublishRequest{
 			Sender:          signerAccount.Address,
@@ -117,6 +116,10 @@ func main() {
 		for _, change := range resp.ObjectChanges {
 			if change.Type == "created" && change.ObjectType == gatewayType {
 				gatewayObjectId = change.ObjectId
+				//utils.PrettyPrint(change)
+				gatewayObjectInitialSharedVersion = change.Version
+				fmt.Printf("gateway obj initial shared version %d\n", gatewayObjectInitialSharedVersion)
+
 			}
 		}
 	}
@@ -281,9 +284,9 @@ func main() {
 			panic(err)
 		}
 
-		utils.PrettyPrint("withdraw tx")
-		utils.PrettyPrint(tx)
-		spew.Dump(tx)
+		//utils.PrettyPrint("withdraw tx")
+		//utils.PrettyPrint(tx)
+		//spew.Dump(tx)
 
 		resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
 			TxnMetaData: tx,
@@ -311,7 +314,8 @@ func main() {
 			}
 		}
 	}
-	{
+
+	{ // PTB withdraw + transfer
 		// acquire the WithdrawCap object first
 		typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
 		withdrawCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
@@ -334,32 +338,96 @@ func main() {
 		client.GetObject(context.Background(), &suiclient.GetObjectRequest{
 			ObjectId: withdrawCap,
 		})
+		// turn the address of signer in hex string 0x... to sui2.Address
+		sender := sui2.MustAddressFromHex(signerAccount.Address)
+		coinPages, err := client.GetCoins(context.Background(), &suiclient.GetCoinsRequest{
+			Owner: sender,
+			Limit: 3,
+		})
+		assertNoErr(err)
+		coins := suiclient.Coins(coinPages.Data)
 
+		var arg0 suiptb.Argument
+		{
+			gatewayObjId := sui2.MustObjectIdFromHex(gatewayObjectId)
+			objResp, err := client.GetObject(context.Background(), &suiclient.GetObjectRequest{
+				ObjectId: gatewayObjId,
+				Options:  &suiclient.SuiObjectDataOptions{},
+			})
+			assertNoErr(err)
+			fmt.Printf("gateway object\n")
+			utils.PrettyPrint(objResp)
+			initVer, err := strconv.ParseInt(gatewayObjectInitialSharedVersion, 10, 64)
+			assertNoErr(err)
+			arg0 = ptb.MustObj(suiptb.ObjectArg{SharedObject: &suiptb.SharedObjectArg{
+				Id: objResp.Data.ObjectId,
+				//InitialSharedVersion: objResp.Data.Version.Uint64(),
+				InitialSharedVersion: uint64(initVer), // must use initial version, not the current version
+				Mutable:              true,
+			}})
+		}
+		arg1 := ptb.MustPure(uint64(1337))
+		arg2 := ptb.MustPure(uint64(1))
+		arg3 := ptb.MustPure(sender)
+		var arg4 suiptb.Argument
+		{
+			// get withdraw cap obj like the above gateway obj
+			withdrawCapObjId := sui2.MustObjectIdFromHex(withdrawCapId)
+			objResp, err := client.GetObject(context.Background(), &suiclient.GetObjectRequest{
+				ObjectId: withdrawCapObjId,
+				Options:  &suiclient.SuiObjectDataOptions{},
+			})
+			assertNoErr(err)
+			fmt.Printf("withdrawCapObjId object\n")
+			utils.PrettyPrint(objResp)
+			arg4 = ptb.MustObj(suiptb.ObjectArg{ImmOrOwnedObject: &sui2.ObjectRef{
+				ObjectId: objResp.Data.ObjectId,
+				Version:  objResp.Data.Version.Uint64(),
+				Digest:   objResp.Data.Digest,
+			}})
+		}
+		// entry fun withdraw<T>(
+		//   gateway: &mut Gateway,
+		//   amount: u64,
+		//   nonce: u64,
+		//   recipient: address,
+		//   cap: &WithdrawCap,
+		//   ctx: &mut TxContext,
 		ptb.Command(suiptb.Command{
 			MoveCall: &suiptb.ProgrammableMoveCall{
 				Package:       packId,
 				Module:        "gateway",
-				Function:      "withdraw_impl",
+				Function:      "withdraw",
 				TypeArguments: []sui2.TypeTag{*tag},
-				Arguments:     []suiptb.Argument{},
+				Arguments:     []suiptb.Argument{arg0, arg1, arg2, arg3, arg4},
 			},
 		})
-		ptb.Finish()
 		pt := ptb.Finish()
-		addr, _ := sui2.AddressFromHex(signerAccount.Address)
-		txData := suiptb.NewTransactionData(
-			addr,
-			pt,
-			[]*sui2.ObjectRef{coins[0].Ref()},
-			suiclient.DefaultGasBudget,
-			suiclient.DefaultGasPrice,
-		)
-		bcs.Marshal(txData)
 
-		client.DryRunTransaction()
+		txData := suiptb.NewTransactionData(sender, pt, []*sui2.ObjectRef{coins[0].Ref()},
+			suiclient.DefaultGasBudget, suiclient.DefaultGasPrice)
+		txBytes, err := bcs.Marshal(txData)
+		assertNoErr(err)
+		fmt.Printf("coins[0]\n")
+		utils.PrettyPrint(coins[0].Ref())
+		//simulate, err := client.DryRunTransaction(context.Background(), txBytes)
+		//assertNoErr(err)
+		//utils.PrettyPrint(simulate)
+		keypair := suisigner.NewKeypairEd25519(signerAccount.PriKey, signerAccount.PubKey)
+
+		signer := suisigner.Signer{
+			Ed25519Keypair: keypair,
+			Address:        sender,
+		}
+		resp, err := client.SignAndExecuteTransaction(context.Background(), &signer, txBytes, &suiclient.SuiTransactionBlockResponseOptions{
+			ShowEffects: true,
+		})
+		assertNoErr(err)
+		assertTrue(resp.Effects.Data.IsSuccess(), "PTB withdraw failed")
+		//utils.PrettyPrint(resp)
 	}
 
-	fmt.Printf("Success!\n")
+	fmt.Printf("THE END!\n")
 }
 
 func printBalance(ctx context.Context, cli sui.ISuiAPI, signerAccount *signer.Signer) {
@@ -392,4 +460,16 @@ func RequestLocalNetSuiFromFaucet(recipient string) {
 
 	// the successful transaction block url: https://suiexplorer.com/txblock/91moaxbXsQnJYScLP2LpbMXV43ZfngS2xnRgj1CT7jLQ?network=devnet
 	fmt.Println("Request DevNet Sui From Faucet success")
+}
+
+func assertNoErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func assertTrue(cond bool, msg string) {
+	if !cond {
+		panic(msg)
+	}
 }
