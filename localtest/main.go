@@ -386,20 +386,27 @@ func main() {
 				Digest:   objResp.Data.Digest,
 			}})
 		}
-		// entry fun withdraw<T>(
-		//   gateway: &mut Gateway,
-		//   amount: u64,
-		//   nonce: u64,
-		//   recipient: address,
-		//   cap: &WithdrawCap,
-		//   ctx: &mut TxContext,
+		//	public fun withdraw_impl<T>(
+		//	gateway: &mut Gateway,
+		//	amount: u64,
+		//	nonce: u64,
+		//	_cap: &WithdrawCap,
+		//	ctx: &mut TxContext,
+		//): Coin<T> {
 		ptb.Command(suiptb.Command{
 			MoveCall: &suiptb.ProgrammableMoveCall{
 				Package:       packId,
 				Module:        "gateway",
-				Function:      "withdraw",
+				Function:      "withdraw_impl",
 				TypeArguments: []sui2.TypeTag{*tag},
-				Arguments:     []suiptb.Argument{arg0, arg1, arg2, arg3, arg4},
+				Arguments:     []suiptb.Argument{arg0, arg1, arg2, arg4},
+			},
+		})
+		_ = arg3
+		ptb.Command(suiptb.Command{
+			TransferObjects: &suiptb.ProgrammableTransferObjects{
+				Objects: []suiptb.Argument{{NestedResult: &suiptb.NestedResult{Cmd: 0, Result: 0}}},
+				Address: arg3,
 			},
 		})
 		pt := ptb.Finish()
