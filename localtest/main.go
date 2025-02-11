@@ -12,6 +12,8 @@ import (
 	"github.com/block-vision/sui-go-sdk/signer"
 	"github.com/block-vision/sui-go-sdk/sui"
 	"github.com/block-vision/sui-go-sdk/utils"
+
+	signer2 "github.com/brewmaster012/sui-gateway/signer"
 )
 
 //go:embed gateway.mv
@@ -200,9 +202,15 @@ func main() {
 
 	// Deposit SUI
 	{
+		s2 := signer2.NewSignerSecp256k1Random()
+		fmt.Printf("signer2 address: %s\n", s2.Address())
+		RequestLocalNetSuiFromFaucet(string(s2.Address()))
+
+		coinObjectId, err := filterOwnedObject(cli, s2.Address(), "0x2::coin::Coin<0x2::sui::SUI>")
+
 		zetaEthAddress := "0x7c125C1d515b8945841b3d5144a060115C58725F"
 		tx, err := cli.MoveCall(ctx, models.MoveCallRequest{
-			Signer:          signerAccount.Address,
+			Signer:          s2.Address(),
 			PackageObjectId: moduleId,
 			Module:          "gateway",
 			Function:        "deposit",
@@ -214,9 +222,9 @@ func main() {
 			panic(err)
 		}
 
-		resp, err := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
+		resp, err := s2.SignAndExecuteTransactionBlock(ctx, cli, models.SignAndExecuteTransactionBlockRequest{
 			TxnMetaData: tx,
-			PriKey:      signerAccount.PriKey,
+			PriKey:      signerAccount.PriKey, // not used; the s2's own private scep256k1 key is used
 			Options: models.SuiTransactionBlockOptions{
 				ShowEffects:        true,
 				ShowBalanceChanges: true,
