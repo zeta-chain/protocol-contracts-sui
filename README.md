@@ -16,7 +16,7 @@ First compile and run the validator
 ```
 Then run the test program
 ```
-cd localhost && go run main.go
+cd localhost && go run .
 ```
 
 If successful you will not see any panic.

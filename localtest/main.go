@@ -23,6 +23,9 @@ import (
 //go:embed gateway.mv
 var gatewayBinary []byte
 
+//go:embed swap.mv
+var swapBinary []byte
+
 // find one object owned by the address and has the type of typeName
 func filterOwnedObject(cli sui.ISuiAPI, address string, typeName string) (objId string, err error) {
 	suiObjectResponseQuery := models.SuiObjectResponseQuery{
@@ -314,7 +317,12 @@ func main() {
 			}
 		}
 	}
-
+	sender := sui2.MustAddressFromHex(signerAccount.Address)
+	keypair := suisigner.NewKeypairEd25519(signerAccount.PriKey, signerAccount.PubKey)
+	signer := suisigner.Signer{
+		Ed25519Keypair: keypair,
+		Address:        sender,
+	}
 	{ // PTB withdraw + transfer
 		// acquire the WithdrawCap object first
 		typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
@@ -339,7 +347,6 @@ func main() {
 			ObjectId: withdrawCap,
 		})
 		// turn the address of signer in hex string 0x... to sui2.Address
-		sender := sui2.MustAddressFromHex(signerAccount.Address)
 		coinPages, err := client.GetCoins(context.Background(), &suiclient.GetCoinsRequest{
 			Owner: sender,
 			Limit: 3,
@@ -413,6 +420,8 @@ func main() {
 
 		txData := suiptb.NewTransactionData(sender, pt, []*sui2.ObjectRef{coins[0].Ref()},
 			suiclient.DefaultGasBudget, suiclient.DefaultGasPrice)
+		fmt.Printf("TxData\n")
+		utils.PrettyPrint(txData)
 		txBytes, err := bcs.Marshal(txData)
 		assertNoErr(err)
 		fmt.Printf("coins[0]\n")
@@ -420,18 +429,69 @@ func main() {
 		//simulate, err := client.DryRunTransaction(context.Background(), txBytes)
 		//assertNoErr(err)
 		//utils.PrettyPrint(simulate)
-		keypair := suisigner.NewKeypairEd25519(signerAccount.PriKey, signerAccount.PubKey)
 
-		signer := suisigner.Signer{
-			Ed25519Keypair: keypair,
-			Address:        sender,
-		}
 		resp, err := client.SignAndExecuteTransaction(context.Background(), &signer, txBytes, &suiclient.SuiTransactionBlockResponseOptions{
 			ShowEffects: true,
 		})
 		assertNoErr(err)
 		assertTrue(resp.Effects.Data.IsSuccess(), "PTB withdraw failed")
 		//utils.PrettyPrint(resp)
+	}
+
+	{ // deploy the swap package
+		client := suiclient.NewClient("http://localhost:9000")
+		swapId := BuildAndPublish(client, &signer)
+		fmt.Printf("swapId: %s\n", swapId.String())
+		testcoinId, _ := BuildDeployMintTestcoin(client, &signer)
+		fmt.Printf("testcoinId: %s\n", testcoinId.String())
+		testcoinCoinType := fmt.Sprintf("%s::testcoin::TESTCOIN", testcoinId.String())
+		testcoinCoins, err := client.GetCoins(
+			context.Background(),
+			&suiclient.GetCoinsRequest{
+				Owner:    signer.Address,
+				CoinType: &testcoinCoinType,
+			},
+		)
+		if err != nil {
+			panic(err)
+		}
+		signerSuiCoinPage, err := client.GetCoins(
+			context.Background(),
+			&suiclient.GetCoinsRequest{
+				Owner: signer.Address,
+			},
+		)
+		if err != nil {
+			panic(err)
+		}
+		poolObjectId := CreatePool(client, &signer, swapId, testcoinId, testcoinCoins.Data[0], signerSuiCoinPage.Data)
+		fmt.Printf("poolObjectId: %s\n", poolObjectId)
+
+		swapper := suisigner.NewSigner(suisigner.TEST_SEED, 1)
+		RequestLocalNetSuiFromFaucet(swapper.Address.String())
+		swapperSuiCoinPage1, err := client.GetAllCoins(
+			context.Background(),
+			&suiclient.GetAllCoinsRequest{Owner: swapper.Address},
+		)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("swapper used to  have")
+		for _, coin := range swapperSuiCoinPage1.Data {
+			fmt.Printf("object: %s in type: %s\n", coin.CoinObjectId, coin.CoinType)
+		}
+		SwapSui(client, swapper, swapId, testcoinId, poolObjectId, swapperSuiCoinPage1.Data)
+		swapperSuiCoinPage2, err := client.GetAllCoins(
+			context.Background(),
+			&suiclient.GetAllCoinsRequest{Owner: swapper.Address},
+		)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("swapper now has")
+		for _, coin := range swapperSuiCoinPage2.Data {
+			fmt.Printf("object: %s in type: %s\n", coin.CoinObjectId, coin.CoinType)
+		}
 	}
 
 	fmt.Printf("THE END!\n")

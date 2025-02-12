@@ -7,6 +7,8 @@ cleanup() {
 # Trap SIGINT (Ctrl-C) so we can do cleanup
 trap cleanup INT
 
+sui move build -p localtest/testcoin && cp localtest/testcoin/build/testcoin/bytecode_modules/testcoin.mv localtest
+sui move build -p localtest/swap && cp localtest/swap/build/swap/bytecode_modules/swap.mv localtest
 sui move build && cp build/gateway/bytecode_modules/gateway.mv localtest
 
 # Start the Sui process in the background
