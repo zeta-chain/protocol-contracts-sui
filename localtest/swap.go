@@ -25,7 +25,7 @@ func CreatePool(
 	testcoinId *sui.ObjectId,
 	testCoin *suiclient.Coin,
 	suiCoins []*suiclient.Coin,
-) *sui.ObjectId {
+) (*sui.ObjectId, *sui.BigInt) {
 	ptb := suiptb.NewTransactionDataTransactionBuilder()
 
 	arg0 := ptb.MustObj(suiptb.ObjectArg{ImmOrOwnedObject: testCoin.Ref()})
@@ -84,12 +84,13 @@ func CreatePool(
 				panic(err)
 			}
 			if resource.Contains(nil, "swap", "Pool") {
-				return &change.Data.Created.ObjectId
+				return &change.Data.Created.ObjectId, change.Data.Created.Version
 			}
 		}
+
 	}
 
-	return nil
+	return nil, nil
 }
 
 func BuildAndPublish(client *suiclient.ClientImpl, signer *suisigner.Signer) *sui.PackageId {

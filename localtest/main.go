@@ -464,7 +464,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		poolObjectId := CreatePool(client, &signer, swapId, testcoinId, testcoinCoins.Data[0], signerSuiCoinPage.Data)
+		poolObjectId, poolObjInitVer := CreatePool(client, &signer, swapId, testcoinId, testcoinCoins.Data[0], signerSuiCoinPage.Data)
 		fmt.Printf("poolObjectId: %s\n", poolObjectId)
 
 		swapper := suisigner.NewSigner(suisigner.TEST_SEED, 1)
@@ -478,7 +478,7 @@ func main() {
 		}
 		fmt.Println("swapper used to  have")
 		for _, coin := range swapperSuiCoinPage1.Data {
-			fmt.Printf("object: %s in type: %s\n", coin.CoinObjectId, coin.CoinType)
+			fmt.Printf("object: %s in type: %s, amount %d\n", coin.CoinObjectId, coin.CoinType, coin.Balance)
 		}
 		SwapSui(client, swapper, swapId, testcoinId, poolObjectId, swapperSuiCoinPage1.Data)
 		swapperSuiCoinPage2, err := client.GetAllCoins(
@@ -490,8 +490,126 @@ func main() {
 		}
 		fmt.Println("swapper now has")
 		for _, coin := range swapperSuiCoinPage2.Data {
-			fmt.Printf("object: %s in type: %s\n", coin.CoinObjectId, coin.CoinType)
+			fmt.Printf("object: %s in type: %s, amount %d\n", coin.CoinObjectId, coin.CoinType, coin.Balance)
 		}
+
+		// PTB-- withdraw + swap_sui
+		typeName := fmt.Sprintf("%s::gateway::WithdrawCap", moduleId)
+		withdrawCapId, err := filterOwnedObject(cli, signerAccount.Address, typeName)
+		if err != nil {
+			panic(err)
+		}
+		//fmt.Printf("withdrawcap id %s\n", withdrawCapId)
+		if withdrawCapId == "" {
+			panic("failed to find WithdrawCap object")
+		}
+		withdrawCap := sui2.MustObjectIdFromHex(withdrawCapId)
+
+		//PTB withdraw + transfer
+		ptb := suiptb.NewTransactionDataTransactionBuilder()
+		packId := sui2.MustPackageIdFromHex(moduleId)
+		//tag, _ := sui2.StructTagFromString()
+		tag := sui2.MustNewTypeTag("0x2::sui::SUI")
+		//withdrawCapObjId := sui2.MustObjectIdFromHex(adminCap)
+		client.GetObject(context.Background(), &suiclient.GetObjectRequest{
+			ObjectId: withdrawCap,
+		})
+		var arg0 suiptb.Argument
+		{
+			gatewayObjId := sui2.MustObjectIdFromHex(gatewayObjectId)
+			objResp, err := client.GetObject(context.Background(), &suiclient.GetObjectRequest{
+				ObjectId: gatewayObjId,
+				Options:  &suiclient.SuiObjectDataOptions{},
+			})
+			assertNoErr(err)
+			//fmt.Printf("gateway object\n")
+			//utils.PrettyPrint(objResp)
+			initVer, err := strconv.ParseInt(gatewayObjectInitialSharedVersion, 10, 64)
+			assertNoErr(err)
+			arg0 = ptb.MustObj(suiptb.ObjectArg{SharedObject: &suiptb.SharedObjectArg{
+				Id: objResp.Data.ObjectId,
+				//InitialSharedVersion: objResp.Data.Version.Uint64(),
+				InitialSharedVersion: uint64(initVer), // must use initial version, not the current version
+				Mutable:              true,
+			}})
+		}
+		arg1 := ptb.MustPure(uint64(1337))
+		arg2 := ptb.MustPure(uint64(2))
+		arg3 := ptb.MustPure(sender)
+		var arg4 suiptb.Argument
+		{
+			// get withdraw cap obj like the above gateway obj
+			withdrawCapObjId := sui2.MustObjectIdFromHex(withdrawCapId)
+			objResp, err := client.GetObject(context.Background(), &suiclient.GetObjectRequest{
+				ObjectId: withdrawCapObjId,
+				Options:  &suiclient.SuiObjectDataOptions{},
+			})
+			assertNoErr(err)
+			fmt.Printf("withdrawCapObjId object\n")
+			utils.PrettyPrint(objResp)
+			arg4 = ptb.MustObj(suiptb.ObjectArg{ImmOrOwnedObject: &sui2.ObjectRef{
+				ObjectId: objResp.Data.ObjectId,
+				Version:  objResp.Data.Version.Uint64(),
+				Digest:   objResp.Data.Digest,
+			}})
+		}
+		ptb.Command(suiptb.Command{
+			MoveCall: &suiptb.ProgrammableMoveCall{
+				Package:       packId,
+				Module:        "gateway",
+				Function:      "withdraw_impl",
+				TypeArguments: []sui2.TypeTag{*tag},
+				Arguments:     []suiptb.Argument{arg0, arg1, arg2, arg4},
+			},
+		})
+		_ = arg3
+
+		arg5 := ptb.MustObj(suiptb.ObjectArg{SharedObject: &suiptb.SharedObjectArg{
+			Id:                   poolObjectId,
+			InitialSharedVersion: poolObjInitVer.Uint64(),
+			Mutable:              true,
+		}})
+		retCoinArg := ptb.Command(suiptb.Command{
+			MoveCall: &suiptb.ProgrammableMoveCall{
+				Package:  swapId,
+				Module:   "swap",
+				Function: "swap_sui",
+				TypeArguments: []sui2.TypeTag{{Struct: &sui2.StructTag{
+					Address: testcoinId,
+					Module:  "testcoin",
+					Name:    "TESTCOIN",
+				}}},
+				Arguments: []suiptb.Argument{arg5, {NestedResult: &suiptb.NestedResult{Cmd: 0, Result: 0}}},
+			},
+		})
+		ptb.Command(suiptb.Command{
+			TransferObjects: &suiptb.ProgrammableTransferObjects{
+				Objects: []suiptb.Argument{retCoinArg},
+				Address: ptb.MustPure(swapper.Address),
+			},
+		})
+		pt := ptb.Finish()
+
+		coinPages, err := client.GetCoins(context.Background(), &suiclient.GetCoinsRequest{
+			Owner: sender,
+			Limit: 3,
+		})
+		assertNoErr(err)
+		coins := suiclient.Coins(coinPages.Data)
+
+		txData := suiptb.NewTransactionData(sender, pt, []*sui2.ObjectRef{coins[0].Ref()},
+			suiclient.DefaultGasBudget, suiclient.DefaultGasPrice)
+		//fmt.Printf("TxData\n")
+		//utils.PrettyPrint(txData)
+		txBytes, err := bcs.Marshal(txData)
+		assertNoErr(err)
+
+		resp, err := client.SignAndExecuteTransaction(context.Background(), &signer, txBytes, &suiclient.SuiTransactionBlockResponseOptions{
+			ShowEffects: true,
+		})
+		assertNoErr(err)
+		assertTrue(resp.Effects.Data.IsSuccess(), "PTB withdraw failed")
+		utils.PrettyPrint(resp)
 	}
 
 	fmt.Printf("THE END!\n")
