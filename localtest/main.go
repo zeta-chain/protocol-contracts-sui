@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/base64"
@@ -12,8 +13,8 @@ import (
 	"github.com/block-vision/sui-go-sdk/signer"
 	"github.com/block-vision/sui-go-sdk/sui"
 	"github.com/block-vision/sui-go-sdk/utils"
+	"github.com/brewmaster012/sui-gateway/bcs"
 	signer2 "github.com/brewmaster012/sui-gateway/signer"
-	"github.com/fardream/go-bcs/bcs"
 	sui2 "github.com/pattonkan/sui-go/sui"
 	"github.com/pattonkan/sui-go/sui/suiptb"
 	"github.com/pattonkan/sui-go/suiclient"
@@ -121,7 +122,7 @@ func main() {
 				gatewayObjectId = change.ObjectId
 				//utils.PrettyPrint(change)
 				gatewayObjectInitialSharedVersion = change.Version
-				fmt.Printf("gateway obj initial shared version %d\n", gatewayObjectInitialSharedVersion)
+				fmt.Printf("gateway obj initial shared version %s\n", gatewayObjectInitialSharedVersion)
 
 			}
 		}
@@ -599,17 +600,49 @@ func main() {
 
 		txData := suiptb.NewTransactionData(sender, pt, []*sui2.ObjectRef{coins[0].Ref()},
 			suiclient.DefaultGasBudget, suiclient.DefaultGasPrice)
-		//fmt.Printf("TxData\n")
-		//utils.PrettyPrint(txData)
+
 		txBytes, err := bcs.Marshal(txData)
 		assertNoErr(err)
+		fmt.Printf("size of txBytes: %d\n", len(txBytes))
+		fmt.Printf("%x\n", txBytes)
+
+		// unmarshal the BCS encoded tx for sanitization:
+		txData2 := &suiptb.TransactionData{}
+		unpackedInt, err := bcs.Unmarshal(txBytes, txData2)
+		assertNoErr(err)
+		fmt.Printf("unpackedInt: %d\n", unpackedInt)
+		fmt.Printf("unpacked TxData\n")
+		txBytes2, err := bcs.Marshal(txData2)
+		assertNoErr(err)
+		assertTrue(bytes.Compare(txBytes, txBytes2) == 0, "unpacked txBytes mismatch")
+
+		// sanitize the tx and reject if
+		// 1. the first command is not withdrawAndCall
+		// 2. there is no owned object other than withdrawCap
+		// 3. subsequent commands only use shared and immutable objects
+
+		// BCS only unmarshal one enum value, so if ProgrammableTransaction is non-nil, other fields are nil
+		assertTrue(txData2.V1.Kind.ProgrammableTransaction != nil, "PTB tx is not programmable")
+		commands := txData2.V1.Kind.ProgrammableTransaction.Commands
+		utils.PrettyPrint(commands[0].MoveCall)
+		numCmds := len(commands)
+		assertTrue(numCmds > 0, "PTB tx has no command")
+		assertTrue(numCmds < 10, "PTB tx has too many commands") // arbitrary limit; just to prevent spam
+		assertTrue(commands[0].MoveCall != nil, "PTB tx first command is not MoveCall")
+		assertTrue(commands[0].MoveCall.Module == "gateway", "PTB tx first command is not gateway")
+		assertTrue(commands[0].MoveCall.Function == "withdraw_impl", "PTB tx first command is not withdraw_impl")
+
+		for _, input := range txData2.V1.Kind.ProgrammableTransaction.Inputs {
+			_ = input
+		}
 
 		resp, err := client.SignAndExecuteTransaction(context.Background(), &signer, txBytes, &suiclient.SuiTransactionBlockResponseOptions{
 			ShowEffects: true,
 		})
 		assertNoErr(err)
 		assertTrue(resp.Effects.Data.IsSuccess(), "PTB withdraw failed")
-		utils.PrettyPrint(resp)
+
+		//utils.PrettyPrint(resp)
 	}
 
 	fmt.Printf("THE END!\n")
