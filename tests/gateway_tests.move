@@ -6,8 +6,8 @@ use gateway::gateway::{
     Gateway,
     whitelist_impl,
     unwhitelist_impl,
-    deposit_impl,
-    deposit_and_call_impl,
+    deposit,
+    deposit_and_call,
     issue_withdraw_and_whitelist_cap_impl,
     pause,
     unpause,
@@ -62,7 +62,7 @@ fun setup(scenario: &mut Scenario) {
         let mut gateway = scenario.take_shared<Gateway>();
         let coin = test_coin(scenario);
         let eth_addr = ValidEthAddr.to_string().to_ascii();
-        deposit_impl(&mut gateway, coin, eth_addr, scenario.ctx());
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
         assert!(vault_balance<SUI>(&gateway) == AmountTest);
 
         ts::return_shared(gateway);
@@ -83,7 +83,7 @@ fun test_deposit_and_call() {
 
         let balance_before = vault_balance<SUI>(&gateway);
 
-        deposit_and_call_impl(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
+        deposit_and_call(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
 
         let balance_after = vault_balance<SUI>(&gateway);
         assert!(balance_after == balance_before + AmountTest);
@@ -105,7 +105,7 @@ fun test_deposit_invalid_address() {
         let coin = test_coin(&mut scenario);
         let eth_addr = b"0x7c125C1d515b8945841b3d5144a060115C58725Fa".to_string().to_ascii();
 
-        deposit_impl(&mut gateway, coin, eth_addr, scenario.ctx());
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
 
         ts::return_shared(gateway);
     };
@@ -124,7 +124,7 @@ fun test_deposit_not_whitelisted() {
         let coin = coin::mint_for_testing<FAKE_USDC>(AmountTest, scenario.ctx());
         let eth_addr = ValidEthAddr.to_string().to_ascii();
 
-        deposit_impl(&mut gateway, coin, eth_addr, scenario.ctx());
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
 
         ts::return_shared(gateway);
     };
@@ -145,7 +145,7 @@ fun test_deposit_paused() {
         let eth_addr = ValidEthAddr.to_string().to_ascii();
 
         pause(&mut gateway, &admin_cap);
-        deposit_impl(&mut gateway, coin, eth_addr, scenario.ctx());
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
 
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
@@ -165,7 +165,7 @@ fun test_deposit_and_call_invalid_address() {
         let coin = test_coin(&mut scenario);
         let eth_addr = b"0x7c125C1d515b8945841b3d5144a060115C58725Fa".to_string().to_ascii();
 
-        deposit_and_call_impl(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
+        deposit_and_call(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
 
         ts::return_shared(gateway);
     };
@@ -184,7 +184,7 @@ fun test_deposit_and_call_not_whitelisted() {
         let coin = coin::mint_for_testing<FAKE_USDC>(AmountTest, scenario.ctx());
         let eth_addr = ValidEthAddr.to_string().to_ascii();
 
-        deposit_and_call_impl(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
+        deposit_and_call(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
 
         ts::return_shared(gateway);
     };
@@ -205,7 +205,7 @@ fun test_deposit_and_call_paused() {
         let eth_addr = ValidEthAddr.to_string().to_ascii();
 
         pause(&mut gateway, &admin_cap);
-        deposit_and_call_impl(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
+        deposit_and_call(&mut gateway, coin, eth_addr, b"hello", scenario.ctx());
 
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
@@ -230,7 +230,7 @@ fun test_pause_and_resume_deposit() {
         assert!(is_paused(&gateway));
         unpause(&mut gateway, &admin_cap);
         assert!(!is_paused(&gateway));
-        deposit_impl(&mut gateway, coin, eth_addr, scenario.ctx());
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
 
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
@@ -519,7 +519,7 @@ fun test_custom_coin() {
         assert!(coin::value(&coin) == AmountTest);
 
         let ethAddr = ValidEthAddr.to_string().to_ascii();
-        deposit_impl(&mut gateway, coin, ethAddr, scenario.ctx());
+        deposit(&mut gateway, coin, ethAddr, scenario.ctx());
         assert!(vault_balance<FAKE_USDC>(&gateway) == AmountTest);
 
         ts::return_shared(gateway);
@@ -547,7 +547,7 @@ fun test_custom_coin() {
 
         let sui_coin = test_coin(&mut scenario);
         let eth_addr = ValidEthAddr.to_string().to_ascii();
-        deposit_impl(&mut gateway, sui_coin, eth_addr, scenario.ctx());
+        deposit(&mut gateway, sui_coin, eth_addr, scenario.ctx());
 
         let nonce = gateway.nonce();
         let coins = withdraw_impl<SUI>(&mut gateway, 13, nonce, &withdraw_cap, scenario.ctx());

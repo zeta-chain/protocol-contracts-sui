@@ -113,22 +113,6 @@ fun init(ctx: &mut TxContext) {
 
 // === Entrypoints ===
 
-// deposit allows the user to deposit tokens into the gateway
-entry fun deposit<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String, ctx: &mut TxContext) {
-    deposit_impl(gateway, coin, receiver, ctx)
-}
-
-// deposit_and_call allows the user to deposit tokens into the gateway and call a contract
-entry fun deposit_and_call<T>(
-    gateway: &mut Gateway,
-    coin: Coin<T>,
-    receiver: String,
-    payload: vector<u8>,
-    ctx: &mut TxContext,
-) {
-    deposit_and_call_impl(gateway, coin, receiver, payload, ctx)
-}
-
 // withdraw allows the TSS to withdraw tokens from the gateway
 entry fun withdraw<T>(
     gateway: &mut Gateway,
@@ -175,7 +159,8 @@ entry fun unpause(gateway: &mut Gateway, cap: &AdminCap) {
 
 // === Deposit Functions ===
 
-public fun deposit_impl<T>(
+// deposit allows the user to deposit tokens into the gateway
+public entry fun deposit<T>(
     gateway: &mut Gateway,
     coin: Coin<T>,
     receiver: String,
@@ -195,7 +180,8 @@ public fun deposit_impl<T>(
     });
 }
 
-public fun deposit_and_call_impl<T>(
+// deposit_and_call allows the user to deposit tokens into the gateway and call a contract
+public entry fun deposit_and_call<T>(
     gateway: &mut Gateway,
     coin: Coin<T>,
     receiver: String,
