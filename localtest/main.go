@@ -32,7 +32,7 @@ type TestSuite struct {
 	cleanups []func()
 }
 
-var keepRunning = flag.Bool("keep-running", false, "Keep the Sui node running indefinitely")
+var keepRunning = flag.Bool("keep-running", false, "Keep the Sui node running")
 
 func main() {
 	flag.Parse()

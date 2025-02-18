@@ -23,8 +23,6 @@ func RunLocalnet() (*exec.Cmd, []byte) {
 	// Prepare Sui start command with environment variables
 	suiCmd := exec.Command("sui", "start", "--with-faucet", "--force-regenesis")
 	suiCmd.Env = append(os.Environ(), "RUST_LOG=off,sui_node=info")
-	suiCmd.Stdout = os.Stdout
-	suiCmd.Stderr = os.Stderr
 
 	// Start Sui process
 	err = suiCmd.Start()
