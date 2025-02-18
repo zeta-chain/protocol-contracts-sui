@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/base64"
+	"flag"
 	"fmt"
 	"os"
 
@@ -20,9 +21,6 @@ const (
 	tssSeed          = "used permit actor clarify cook glue size hard coyote wild circle youth"
 )
 
-//go:embed gateway.mv
-var gatewayBinary []byte
-
 type TestSuite struct {
 	PackageID       string
 	GatewayObjectID string
@@ -30,10 +28,31 @@ type TestSuite struct {
 	Client          sui.ISuiAPI
 	Signer          *signer.Signer
 	TSS             *tss.SignerSecp256k1
+
+	cleanups []func()
 }
 
+var keepRunning = flag.Bool("keep-running", false, "Keep the Sui node running indefinitely")
+
 func main() {
-	ts := newTestSuite(endpointLocalnet)
+	flag.Parse()
+
+	// Run Sui node
+	suiCmd, gatewayBinary := RunLocalnet()
+
+	// Start test suite
+	ts := newTestSuite(endpointLocalnet, gatewayBinary)
+
+	// Either keep the Sui node running or kill it after the tests
+	ts.AddCleanup(func() {
+		if *keepRunning {
+			fmt.Printf("Sui node is still running, PID: %d\n", suiCmd.Process.Pid)
+			return
+		}
+
+		suiCmd.Process.Kill()
+		fmt.Printf("Sui node is killed, PID: %d\n", suiCmd.Process.Pid)
+	})
 
 	ts.Log("packageID: %s", ts.PackageID)
 	ts.Log("gatewayObjectID: %s", ts.GatewayObjectID)
@@ -63,7 +82,9 @@ func (ts *TestSuite) FailNow() { ts.Cleanup(false) }
 func (ts *TestSuite) Cleanup(success bool) {
 	fmt.Println("Cleaning up...")
 
-	// todo cleanup local net
+	for _, fn := range ts.cleanups {
+		fn()
+	}
 
 	var code int
 	if !success {
@@ -75,6 +96,10 @@ func (ts *TestSuite) Cleanup(success bool) {
 	os.Exit(code)
 }
 
+func (ts *TestSuite) AddCleanup(fn func()) {
+	ts.cleanups = append(ts.cleanups, fn)
+}
+
 func (ts *TestSuite) RequestLocalNetSuiFromFaucet(recipient string) {
 	err := requestLocalNetSuiFromFaucet(recipient)
 	require.NoError(ts, err)
@@ -82,7 +107,7 @@ func (ts *TestSuite) RequestLocalNetSuiFromFaucet(recipient string) {
 	fmt.Println("Requested DevNet Sui From Faucet success")
 }
 
-func newTestSuite(endpoint string) *TestSuite {
+func newTestSuite(endpoint string, gatewayBinary []byte) *TestSuite {
 	ctx := context.Background()
 	client := sui.NewSuiClient(endpoint)
 
@@ -195,12 +220,6 @@ func filterOwnedObject(cli sui.ISuiAPI, address, typeName string) (objId string,
 	return "", fmt.Errorf("no object of type %s found", typeName)
 }
 
-func guard(err error) {
-	if err != nil {
-		panic(err.Error())
-	}
-}
-
 func requestLocalNetSuiFromFaucet(recipient string) error {
 	faucetHost, err := sui.GetFaucetHost(constant.SuiLocalnet)
 	if err != nil {
@@ -209,4 +228,10 @@ func requestLocalNetSuiFromFaucet(recipient string) error {
 
 	header := map[string]string{}
 	return sui.RequestSuiFromFaucet(faucetHost, recipient, header)
+}
+
+func guard(err error) {
+	if err != nil {
+		panic(err.Error())
+	}
 }
