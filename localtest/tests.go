@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const suiCoin = "0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+
 func TestDeposit(ts *TestSuite) {
 	// ARRANGE
 	// Request some SUI from the faucet
@@ -24,7 +26,7 @@ func TestDeposit(ts *TestSuite) {
 		PackageObjectId: ts.PackageID,
 		Module:          "gateway",
 		Function:        "deposit",
-		TypeArguments:   []any{"0x2::sui::SUI"},
+		TypeArguments:   []any{suiCoin},
 		Arguments:       []any{ts.GatewayObjectID, coinObjectId, zetaEthAddress},
 		GasBudget:       "5000000000",
 	})
@@ -110,7 +112,7 @@ func TestWithdrawal(ts *TestSuite) {
 		PackageObjectId: ts.PackageID,
 		Module:          "gateway",
 		Function:        "withdraw",
-		TypeArguments:   []any{"0x2::sui::SUI"},
+		TypeArguments:   []any{suiCoin},
 		Arguments:       []any{ts.GatewayObjectID, amt, nonce, bob, withdrawCapID},
 		GasBudget:       "5000000000",
 	})
@@ -140,4 +142,15 @@ func TestWithdrawal(ts *TestSuite) {
 			require.Equal(ts, amt, change.Amount)
 		}
 	}
+
+	require.Equal(ts, 1, len(resp.Events))
+	withdrawEvent := resp.Events[0]
+
+	// Check event
+	require.Equal(ts, fmt.Sprintf("%s::gateway::WithdrawEvent", ts.PackageID), withdrawEvent.Type)
+	require.Equal(ts, suiCoin, withdrawEvent.ParsedJson["coin_type"])
+	require.Equal(ts, amt, withdrawEvent.ParsedJson["amount"])
+	require.Equal(ts, nonce, withdrawEvent.ParsedJson["nonce"])
+	require.Equal(ts, bob, withdrawEvent.ParsedJson["receiver"])
+	require.Equal(ts, ts.TSS.Address(), withdrawEvent.ParsedJson["sender"])
 }
