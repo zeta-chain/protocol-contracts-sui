@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"log"
+	"fmt"
 	"math/big"
 
 	"github.com/block-vision/sui-go-sdk/models"
@@ -83,6 +83,8 @@ func (s *SignerSecp256k1) GetPublicKey() []byte {
 	return append([]byte{prefix}, paddedX...)
 }
 
+// Address derives SUI address based on ECDSA public key
+// See https://docs.sui.io/concepts/cryptography/transaction-auth/signatures
 func (s *SignerSecp256k1) Address() string {
 	// Get the public key bytes
 	pubKeyBytes := s.GetPublicKey()
@@ -107,46 +109,6 @@ func (s *SignerSecp256k1) Address() string {
 	return "0x" + hex.EncodeToString(addrBytes)
 }
 
-type SignedMessageSerializedSig struct {
-	Message   string `json:"message"`
-	Signature string `json:"signature"`
-}
-
-// // https://docs.sui.io/concepts/cryptography/transaction-auth/signatures
-// func (s *SignerSecp256k1) SignMessage(data string, scope constant.IntentScope) (*SignedMessageSerializedSig, error) {
-// 	txBytes, _ := base64.StdEncoding.DecodeString(data)
-// 	message := models.NewMessageWithIntent(txBytes, scope)
-// 	digest := blake2b.Sum256(message)
-// 	var noHash crypto.Hash
-// 	sigBytes, err := s.privkey.Sign(rand.Reader, digest[:], noHash)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	ret := &SignedMessageSerializedSig{
-// 		Message:   data,
-// 		Signature: ToSerializedSignature(sigBytes, s.GetPublicKey()),
-// 	}
-// 	return ret, nil
-// }
-
-// func (s *SignerSecp256k1) SignTransaction(b64TxBytes string) (*models.SignedTransactionSerializedSig, error) {
-// 	result, err := s.SignMessage(b64TxBytes, constant.PersonalMessageIntentScope)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &models.SignedTransactionSerializedSig{
-// 		TxBytes:   result.Message,
-// 		Signature: result.Signature,
-// 	}, nil
-// }
-
-// func (s *SignerSecp256k1) SignPersonalMessage(message string) (*SignedMessageSerializedSig, error) {
-// 	b64Message := base64.StdEncoding.EncodeToString([]byte(message))
-// 	return s.SignMessage(b64Message, constant.PersonalMessageIntentScope)
-// }
-
 func ToSerializedSignature(signature, pubKey []byte) string {
 	signatureLen := len(signature)
 	pubKeyLen := len(pubKey)
@@ -157,9 +119,13 @@ func ToSerializedSignature(signature, pubKey []byte) string {
 	return base64.StdEncoding.EncodeToString(serializedSignature)
 }
 
-// SignAndExecuteTransactionBlock sign a transaction block and submit to the Fullnode for execution.
-// adapted from sui-go-sdk/sui/signer.go for secp256k1
-func (s *SignerSecp256k1) SignAndExecuteTransactionBlock(ctx context.Context, cli sui.ISuiAPI, req models.SignAndExecuteTransactionBlockRequest) (models.SuiTransactionBlockResponse, error) {
+// SignAndExecuteTransactionBlock signs a tx block and submits it to RPC.
+// Adapted from sui-go-sdk/sui/signer.go for secp256k1
+func (s *SignerSecp256k1) SignAndExecuteTransactionBlock(
+	ctx context.Context,
+	cli sui.ISuiAPI,
+	req models.SignAndExecuteTransactionBlockRequest,
+) (models.SuiTransactionBlockResponse, error) {
 	txBytes, _ := base64.StdEncoding.DecodeString(req.TxnMetaData.TxBytes)
 	message := messageWithIntent(txBytes)
 	digest1 := blake2b.Sum256(message)
@@ -169,9 +135,9 @@ func (s *SignerSecp256k1) SignAndExecuteTransactionBlock(ctx context.Context, cl
 	// privBytes := crypto.FromECDSA(s.privkey)
 	sigBytes, err := crypto2.Sign(digest2[:], s.privkey)
 	if err != nil {
-		log.Printf("SignAndExecuteTransactionBlock: %v", err)
-		return models.SuiTransactionBlockResponse{}, err
+		return models.SuiTransactionBlockResponse{}, fmt.Errorf("failed to sign tx: %w", err)
 	}
+
 	sigBytes = sigBytes[:64]
 
 	signature := ToSerializedSignature(sigBytes, s.GetPublicKey())
