@@ -74,6 +74,14 @@ public struct DepositAndCallEvent has copy, drop {
     payload: vector<u8>,
 }
 
+public struct WithdrawEvent has copy, drop {
+    coin_type: String,
+    amount: u64,
+    sender: address,
+    receiver: address,
+    nonce: u64,
+}
+
 // === Initialization ===
 
 fun init(ctx: &mut TxContext) {
@@ -123,7 +131,17 @@ entry fun withdraw<T>(
     ctx: &mut TxContext,
 ) {
     let coin = withdraw_impl<T>(gateway, amount, nonce, cap, ctx);
+
     transfer::public_transfer(coin, receiver);
+
+    // Emit event
+    event::emit(WithdrawEvent {
+        coin_type: coin_name<T>(),
+        amount: amount,
+        sender: tx_context::sender(ctx),
+        receiver: receiver,
+        nonce: nonce,
+    });
 }
 
 // whitelist whitelists a new coin by creating a new vault for the coin type
@@ -235,6 +253,7 @@ public fun withdraw_impl<T>(
     let coin_name = coin_name<T>();
     let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
     let coin_out = coin::take(&mut vault.balance, amount, ctx);
+
     coin_out
 }
 
