@@ -130,8 +130,18 @@ entry fun withdraw<T>(
     cap: &WithdrawCap,
     ctx: &mut TxContext,
 ) {
-    let coin = withdraw_impl<T>(gateway, amount, nonce, receiver, cap, ctx);
+    let coin = withdraw_impl<T>(gateway, amount, nonce, cap, ctx);
+
     transfer::public_transfer(coin, receiver);
+
+    // Emit event
+    event::emit(WithdrawEvent {
+        coin_type: coin_name<T>(),
+        amount: amount,
+        sender: tx_context::sender(ctx),
+        receiver: receiver,
+        nonce: nonce,
+    });
 }
 
 // whitelist whitelists a new coin by creating a new vault for the coin type
@@ -231,7 +241,6 @@ public fun withdraw_impl<T>(
     gateway: &mut Gateway,
     amount: u64,
     nonce: u64,
-    receiver: address,
     cap: &WithdrawCap,
     ctx: &mut TxContext,
 ): Coin<T> {
@@ -244,15 +253,6 @@ public fun withdraw_impl<T>(
     let coin_name = coin_name<T>();
     let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
     let coin_out = coin::take(&mut vault.balance, amount, ctx);
-
-    // Emit event
-    event::emit(WithdrawEvent {
-        coin_type: coin_name,
-        amount: amount,
-        sender: tx_context::sender(ctx),
-        receiver: receiver,
-        nonce: nonce,
-    });
 
     coin_out
 }

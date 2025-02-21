@@ -248,7 +248,7 @@ fun test_withdraw() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, @0xA, &cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
         assert!(coin::value(&coins) == 10);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
@@ -277,7 +277,7 @@ fun test_withdraw_inactive_withdraw_cap() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = create_test_withdraw_cap(scenario.ctx());
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, @0xA, &cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
         assert!(coin::value(&coins) == 10);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
@@ -296,7 +296,7 @@ fun test_withdraw_wrong_nonce() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce() + 1; // intentially create a mismatch
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, @0xA, &cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
         assert!(coin::value(&coins) == 10);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
@@ -356,7 +356,7 @@ fun test_issue_withdraw_and_whitelist_cap() {
 
         // can withdraw with new cap
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, @0xA, &withdraw_cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &withdraw_cap, scenario.ctx());
         transfer::public_transfer(coins, @0xA);
 
         // can whitelist with new cap
@@ -388,7 +388,7 @@ fun test_issue_withdraw_and_whitelist_cap_revoke_withdraw() {
         );
 
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, @0xA, &old_withdraw_cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &old_withdraw_cap, scenario.ctx());
         transfer::public_transfer(coins, @0xA);
 
         transfer::public_freeze_object(withdraw_cap);
@@ -479,7 +479,7 @@ fun test_withdraw_not_whitelist() {
         // try withdraw
         let withdraw_cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, @0xA, &withdraw_cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &withdraw_cap, scenario.ctx());
 
         ts::return_to_address(@0xA, admin_cap);
         ts::return_to_address(@0xA, withdraw_cap);
@@ -530,7 +530,7 @@ fun test_custom_coin() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<FAKE_USDC>(&mut gateway, 13, nonce, @0xA, &cap, scenario.ctx());
+        let coins = withdraw_impl<FAKE_USDC>(&mut gateway, 13, nonce, &cap, scenario.ctx());
         assert!(coin::value(&coins) == 13);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
@@ -550,7 +550,7 @@ fun test_custom_coin() {
         deposit(&mut gateway, sui_coin, eth_addr, scenario.ctx());
 
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 13, nonce, @0xA, &withdraw_cap, scenario.ctx());
+        let coins = withdraw_impl<SUI>(&mut gateway, 13, nonce, &withdraw_cap, scenario.ctx());
         assert!(coin::value(&coins) == 13);
 
         ts::return_to_address(@0xA, admin_cap);
@@ -572,7 +572,6 @@ fun test_custom_coin() {
             &mut gateway,
             13,
             nonce,
-            @0xA,
             &withdraw_cap,
             scenario.ctx(),
         );
