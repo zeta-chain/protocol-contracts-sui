@@ -7,7 +7,9 @@ use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin};
 use sui::event;
 use sui::sui::SUI;
+use sui::hex::decode;
 
+use sui::bls12381::{bls12381_min_sig_verify,};
 // === Errors ===
 
 const EAlreadyWhitelisted: u64 = 0;
@@ -351,6 +353,8 @@ fun coin_name<T>(): String {
     into_string(get<T>())
 }
 
+
+
 // === Test Helpers ===
 
 #[test_only]
@@ -370,4 +374,15 @@ public fun create_test_whitelist_cap(ctx: &mut TxContext): WhitelistCap {
     WhitelistCap {
         id: object::new(ctx),
     }
+}
+
+#[test]
+public fun test_bls12381_min_sig_verify() {
+    let msg  = b"Hello BLS";
+    let sig = decode(b"94138847ea1e9b6723bbdfc689b3f106a36d1630f13a87e5dcb542d84dc95c56b961a6b6a5564c371723c355e1a87e3c");
+    let pk = decode(b"83bd626a1f81bfe207032acac50127ad0807bd469c24d03fe006bb94a46047705e5f10f5ff7b93077dbeef7c4886c78b0158128021c5e33394166b8458a20bf6883ba90b1bc810343ef8104d1da2a801cae9cf354eb1a3c9c57025dffb971419");
+    assert!(sig.length() == 48, 1);
+    assert!(pk.length() == 96, 2);
+    let valid = bls12381_min_sig_verify(&sig, &pk, &msg);
+    assert!(valid, 3);
 }
