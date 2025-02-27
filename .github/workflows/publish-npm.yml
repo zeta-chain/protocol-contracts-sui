@@ -19,7 +19,9 @@ jobs:
 
       - name: Build Sui Move Artifacts
         run: |
-          docker run -i -v $(pwd):/sui -v ~/.sui:/root/.sui $SUI_IMAGE sh -c "sui move build --dump-bytecode-as-base64 | tee /sui/gateway.json"
+          docker run -i -v $(pwd):/sui -v ~/.sui:/root/.sui $SUI_IMAGE sh -c "sui client -y && sui move build --dump-bytecode-as-base64 | tee /sui/gateway.json"
+          ls
+          cat gateway.json
 
       # - name: Fix permissions
       #   run: sudo chown $(whoami) gateway.json
