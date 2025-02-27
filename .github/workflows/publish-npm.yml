@@ -19,7 +19,7 @@ jobs:
 
       - name: Build Sui Move Artifacts
         run: |
-          docker run -i -v $(pwd):/sui $SUI_IMAGE sui move test
+          docker run -i -v $(pwd):/sui $SUI_IMAGE sui move build
 
       # - name: Determine NPM Tag
       #   id: determine-npm-tag
