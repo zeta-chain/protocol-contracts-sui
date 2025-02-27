@@ -6,6 +6,9 @@ name: Publish to NPM
 on:
   pull_request:
 
+env:
+  SUI_IMAGE: ghcr.io/zeta-chain/sui-docker@sha256:0741082009ef5034cbb4a3e43215b1a37719a5a16f532e150a83add54a34316c
+
 jobs:
   publish:
     runs-on: ubuntu-latest
