@@ -13,11 +13,10 @@ use sui::sui::SUI;
 const EAlreadyWhitelisted: u64 = 0;
 const EInvalidReceiverAddress: u64 = 1;
 const ENotWhitelisted: u64 = 2;
-const ENonceMismatch: u64 = 3;
-const EPayloadTooLong: u64 = 4;
-const EInactiveWithdrawCap: u64 = 5;
-const EInactiveWhitelistCap: u64 = 6;
-const EDepositPaused: u64 = 7;
+const EPayloadTooLong: u64 = 3;
+const EInactiveWithdrawCap: u64 = 4;
+const EInactiveWhitelistCap: u64 = 5;
+const EDepositPaused: u64 = 6;
 
 const ReceiverAddressLength: u64 = 42;
 const PayloadMaxLength: u64 = 1024;
@@ -34,7 +33,6 @@ public struct Vault<phantom T> has store {
 public struct Gateway has key {
     id: UID,
     vaults: Bag,
-    nonce: u64,
     active_withdraw_cap: ID,
     active_whitelist_cap: ID,
     deposit_paused: bool,
@@ -79,7 +77,6 @@ public struct WithdrawEvent has copy, drop {
     amount: u64,
     sender: address,
     receiver: address,
-    nonce: u64,
 }
 
 // === Initialization ===
@@ -104,7 +101,6 @@ fun init(ctx: &mut TxContext) {
     let mut gateway = Gateway {
         id: object::new(ctx),
         vaults: bag::new(ctx),
-        nonce: 0,
         active_withdraw_cap: object::id(&withdraw_cap),
         active_whitelist_cap: object::id(&whitelist_cap),
         deposit_paused: false,
@@ -125,12 +121,11 @@ fun init(ctx: &mut TxContext) {
 entry fun withdraw<T>(
     gateway: &mut Gateway,
     amount: u64,
-    nonce: u64,
     receiver: address,
     cap: &WithdrawCap,
     ctx: &mut TxContext,
 ) {
-    let coin = withdraw_impl<T>(gateway, amount, nonce, cap, ctx);
+    let coin = withdraw_impl<T>(gateway, amount, cap, ctx);
 
     transfer::public_transfer(coin, receiver);
 
@@ -140,7 +135,6 @@ entry fun withdraw<T>(
         amount: amount,
         sender: tx_context::sender(ctx),
         receiver: receiver,
-        nonce: nonce,
     });
 }
 
@@ -240,14 +234,11 @@ fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coin: Coin<T>,
 public fun withdraw_impl<T>(
     gateway: &mut Gateway,
     amount: u64,
-    nonce: u64,
     cap: &WithdrawCap,
     ctx: &mut TxContext,
 ): Coin<T> {
     assert!(gateway.active_withdraw_cap == object::id(cap), EInactiveWithdrawCap);
     assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
-    assert!(nonce == gateway.nonce, ENonceMismatch); // prevent replay
-    gateway.nonce = nonce + 1;
 
     // Withdraw the coin from the vault
     let coin_name = coin_name<T>();
@@ -308,10 +299,6 @@ public fun unpause_impl(gateway: &mut Gateway, _cap: &AdminCap) {
 }
 
 // === View Functions ===
-
-public fun nonce(gateway: &Gateway): u64 {
-    gateway.nonce
-}
 
 public fun active_withdraw_cap(gateway: &Gateway): ID {
     gateway.active_withdraw_cap
