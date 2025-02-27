@@ -19,7 +19,7 @@ jobs:
 
       - name: Build Sui Move Artifacts
         run: |
-          docker run -i -v $(pwd)/gateway.json:/sui/gateway.json $SUI_IMAGE sh -c "sui move build ---dump-bytecode-as-base64 > /sui/gateway.json"
+          docker run -i -v $(pwd)/gateway.json:/sui/gateway.json $SUI_IMAGE sh -c "sui move build ---dump-bytecode-as-base64 > ./gateway.json"
           ls
 
       # - name: Determine NPM Tag
