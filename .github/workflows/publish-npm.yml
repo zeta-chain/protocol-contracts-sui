@@ -1,10 +1,8 @@
 name: Publish to NPM
 
-# on:
-#   release:
-#     types: [published]
 on:
-  pull_request:
+  release:
+    types: [published]
 
 env:
   SUI_IMAGE: ghcr.io/zeta-chain/sui-docker@sha256:0741082009ef5034cbb4a3e43215b1a37719a5a16f532e150a83add54a34316c
@@ -17,7 +15,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build Sui Move Artifacts
+      - name: Build and Generate Gateway JSON
         run: |
           docker run -i -v $(pwd):/sui -v ~/.sui:/root/.sui $SUI_IMAGE sh -c "sui client -y && sui move build --dump-bytecode-as-base64 | tee /sui/gateway.json"
 
@@ -27,22 +25,22 @@ jobs:
       - name: Verify gateway.json
         run: cat gateway.json
 
-      # - name: Determine NPM Tag
-      #   id: determine-npm-tag
-      #   run: |
-      #     VERSION_TAG=${GITHUB_REF#refs/tags/v}
-      #     if [[ $VERSION_TAG == *"-"* ]]; then
-      #       echo ::set-output name=NPM_TAG::${VERSION_TAG#*-}
-      #     else
-      #       echo ::set-output name=NPM_TAG::latest
-      #     fi
-      #   env:
-      #     GITHUB_REF: ${{ github.ref }}
+      - name: Determine NPM Tag
+        id: determine-npm-tag
+        run: |
+          VERSION_TAG=${GITHUB_REF#refs/tags/v}
+          if [[ $VERSION_TAG == *"-"* ]]; then
+            echo ::set-output name=NPM_TAG::${VERSION_TAG#*-}
+          else
+            echo ::set-output name=NPM_TAG::latest
+          fi
+        env:
+          GITHUB_REF: ${{ github.ref }}
 
-      # - name: Publish to NPM
-      #   run: |
-      #     yarn publish --access public --new-version ${GITHUB_REF#refs/tags/v} --tag ${{
-      #     steps.determine-npm-tag.outputs.NPM_TAG }} --no-git-tag-version
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      #     GITHUB_REF: ${{ github.ref }}
+      - name: Publish to NPM
+        run: |
+          yarn publish --access public --new-version ${GITHUB_REF#refs/tags/v} --tag ${{
+          steps.determine-npm-tag.outputs.NPM_TAG }} --no-git-tag-version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_REF: ${{ github.ref }}
