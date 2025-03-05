@@ -82,6 +82,11 @@ public struct WithdrawEvent has copy, drop {
     nonce: u64,
 }
 
+public struct NonceIncreaseEvent has copy, drop {
+    sender: address,
+    nonce: u64,
+}
+
 // === Initialization ===
 
 fun init(ctx: &mut TxContext) {
@@ -120,6 +125,21 @@ fun init(ctx: &mut TxContext) {
 }
 
 // === Entrypoints ===
+
+// increase_nonce increases the nonce of the gateway
+// it is used when a failed outbound needs to be reported to ZetaChain
+// it is sent by the tss and therefore requires the withdraw cap
+entry fun increase_nonce(gateway: &mut Gateway, nonce: u64, cap: &WithdrawCap, ctx: &TxContext) {
+    assert!(gateway.active_withdraw_cap == object::id(cap), EInactiveWithdrawCap);
+    assert!(nonce == gateway.nonce, ENonceMismatch);
+    gateway.nonce = nonce + 1;
+
+    // Emit event
+    event::emit(NonceIncreaseEvent {
+        sender: tx_context::sender(ctx),
+        nonce: gateway.nonce,
+    });
+}
 
 // withdraw allows the TSS to withdraw tokens from the gateway
 entry fun withdraw<T>(
