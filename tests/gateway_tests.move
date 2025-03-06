@@ -12,6 +12,7 @@ use gateway::gateway::{
     pause,
     unpause,
     is_paused,
+    increase_nonce,
     withdraw_impl,
     is_whitelisted,
     vault_balance,
@@ -233,6 +234,63 @@ fun test_pause_and_resume_deposit() {
         deposit(&mut gateway, coin, eth_addr, scenario.ctx());
 
         ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test]
+fun test_increase_nonce() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+        let nonce = gateway.nonce();
+        increase_nonce(&mut gateway, nonce, &cap, scenario.ctx());
+        ts::return_to_address(@0xA, cap);
+        ts::return_shared(gateway);
+    };
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let gateway = scenario.take_shared<Gateway>();
+        assert!(gateway.nonce() == 1);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = EInactiveWithdrawCap)]
+fun test_test_increase_nonce_inactive_withdraw_cap() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let cap = create_test_withdraw_cap(scenario.ctx());
+        let nonce = gateway.nonce();
+        increase_nonce(&mut gateway, nonce, &cap, scenario.ctx());
+        ts::return_to_address(@0xA, cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = ENonceMismatch)]
+fun test_test_increase_nonce_wrong_nonce() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+        let nonce = gateway.nonce() + 1; // intentially create a mismatch
+        increase_nonce(&mut gateway, nonce, &cap, scenario.ctx());
+        ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
     };
     ts::end(scenario);
