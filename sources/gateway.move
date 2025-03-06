@@ -147,12 +147,14 @@ entry fun withdraw<T>(
     amount: u64,
     nonce: u64,
     receiver: address,
+    gas_budget: u64,
     cap: &WithdrawCap,
     ctx: &mut TxContext,
 ) {
-    let coin = withdraw_impl<T>(gateway, amount, nonce, cap, ctx);
+    let (coin, coin_gas_budget) = withdraw_impl<T>(gateway, amount, gas_budget, nonce, cap, ctx);
 
     transfer::public_transfer(coin, receiver);
+    transfer::public_transfer(coin_gas_budget, tx_context::sender(ctx));
 
     // Emit event
     event::emit(WithdrawEvent {
@@ -261,9 +263,10 @@ public fun withdraw_impl<T>(
     gateway: &mut Gateway,
     amount: u64,
     nonce: u64,
+    gas_budget: u64,
     cap: &WithdrawCap,
     ctx: &mut TxContext,
-): Coin<T> {
+): (Coin<T>, Coin<sui::sui::SUI>) {
     assert!(gateway.active_withdraw_cap == object::id(cap), EInactiveWithdrawCap);
     assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
     assert!(nonce == gateway.nonce, ENonceMismatch); // prevent replay
@@ -274,7 +277,14 @@ public fun withdraw_impl<T>(
     let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
     let coin_out = coin::take(&mut vault.balance, amount, ctx);
 
-    coin_out
+    // Withdraw SUI to cover the gas budget
+    let sui_vault = bag::borrow_mut<String, Vault<sui::sui::SUI>>(
+        &mut gateway.vaults,
+        coin_name<sui::sui::SUI>(),
+    );
+    let coin_gas_budget = coin::take(&mut sui_vault.balance, gas_budget, ctx);
+
+    (coin_out, coin_gas_budget)
 }
 
 // === Admin Functions ===

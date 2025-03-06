@@ -306,11 +306,20 @@ fun test_withdraw() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
+        let (coins, coins_gas) = withdraw_impl<SUI>(
+            &mut gateway,
+            10,
+            nonce,
+            5,
+            &cap,
+            scenario.ctx(),
+        );
         assert!(coin::value(&coins) == 10);
+        assert!(coin::value(&coins_gas) == 5);
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xB);
     };
     ts::next_tx(&mut scenario, @0xA);
     {
@@ -319,7 +328,10 @@ fun test_withdraw() {
         assert!(gateway.nonce() == 1);
         let coin = ts::take_from_address<Coin<SUI>>(&scenario, @0xA);
         assert!(coin::value(&coin) == 10);
+         let coin_gas = ts::take_from_address<Coin<SUI>>(&scenario, @0xB);
+        assert!(coin::value(&coin_gas) == 5);
         ts::return_to_address(@0xA, coin);
+        ts::return_to_address(@0xB, coin_gas);
         ts::return_shared(gateway);
     };
     ts::end(scenario);
@@ -335,11 +347,18 @@ fun test_withdraw_inactive_withdraw_cap() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = create_test_withdraw_cap(scenario.ctx());
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
-        assert!(coin::value(&coins) == 10);
+        let (coins, coins_gas) = withdraw_impl<SUI>(
+            &mut gateway,
+            10,
+            nonce,
+            5,
+            &cap,
+            scenario.ctx(),
+        );
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xA);
     };
     ts::end(scenario);
 }
@@ -354,11 +373,18 @@ fun test_withdraw_wrong_nonce() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce() + 1; // intentially create a mismatch
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &cap, scenario.ctx());
-        assert!(coin::value(&coins) == 10);
+        let (coins, coins_gas) = withdraw_impl<SUI>(
+            &mut gateway,
+            10,
+            nonce,
+            5,
+            &cap,
+            scenario.ctx(),
+        );
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xA);
     };
     ts::end(scenario);
 }
@@ -414,8 +440,16 @@ fun test_issue_withdraw_and_whitelist_cap() {
 
         // can withdraw with new cap
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &withdraw_cap, scenario.ctx());
+        let (coins, coins_gas) = withdraw_impl<SUI>(
+            &mut gateway,
+            10,
+            nonce,
+            5,
+            &withdraw_cap,
+            scenario.ctx(),
+        );
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xA);
 
         // can whitelist with new cap
         whitelist_impl<FAKE_USDC>(&mut gateway, &whitelist_cap);
@@ -446,8 +480,16 @@ fun test_issue_withdraw_and_whitelist_cap_revoke_withdraw() {
         );
 
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &old_withdraw_cap, scenario.ctx());
+        let (coins, coins_gas) = withdraw_impl<SUI>(
+            &mut gateway,
+            10,
+            nonce,
+            5,
+            &old_withdraw_cap,
+            scenario.ctx(),
+        );
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xA);
 
         transfer::public_freeze_object(withdraw_cap);
         transfer::public_freeze_object(whitelist_cap);
@@ -537,12 +579,20 @@ fun test_withdraw_not_whitelist() {
         // try withdraw
         let withdraw_cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 10, nonce, &withdraw_cap, scenario.ctx());
+        let (coins, coins_gas) = withdraw_impl<SUI>(
+            &mut gateway,
+            10,
+            nonce,
+            5,
+            &withdraw_cap,
+            scenario.ctx(),
+        );
 
         ts::return_to_address(@0xA, admin_cap);
         ts::return_to_address(@0xA, withdraw_cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xA);
     };
     ts::end(scenario);
 }
@@ -555,6 +605,18 @@ fun test_custom_coin() {
     {
         init_for_testing(scenario.ctx());
         init_fake_usdc(scenario.ctx());
+    };
+
+     ts::next_tx(&mut scenario, @0xA);
+    {
+        // deposit SUI
+        let mut gateway = scenario.take_shared<Gateway>();
+        let coin = test_coin(&mut scenario);
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
+        assert!(vault_balance<SUI>(&gateway) == AmountTest);
+
+        ts::return_shared(gateway);
     };
 
     ts::next_tx(&mut scenario, @0xA);
@@ -588,11 +650,21 @@ fun test_custom_coin() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<FAKE_USDC>(&mut gateway, 13, nonce, &cap, scenario.ctx());
+        let (coins, coins_gas) = withdraw_impl<FAKE_USDC>(
+            &mut gateway,
+            13,
+            nonce,
+            2,
+            &cap,
+            scenario.ctx(),
+        );
         assert!(coin::value(&coins) == 13);
+        assert!(coin::value(&coins_gas) == 2);
+
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xA);
     };
     ts::next_tx(&mut scenario, @0xA);
     {
@@ -608,13 +680,22 @@ fun test_custom_coin() {
         deposit(&mut gateway, sui_coin, eth_addr, scenario.ctx());
 
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<SUI>(&mut gateway, 13, nonce, &withdraw_cap, scenario.ctx());
+        let (coins, coins_gas) = withdraw_impl<SUI>(
+            &mut gateway,
+            13,
+            nonce,
+            2,
+            &withdraw_cap,
+            scenario.ctx(),
+        );
         assert!(coin::value(&coins) == 13);
+        assert!(coin::value(&coins_gas) == 2);
 
         ts::return_to_address(@0xA, admin_cap);
         ts::return_to_address(@0xA, withdraw_cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xA);
     };
     ts::next_tx(&mut scenario, @0xA);
     {
@@ -626,19 +707,22 @@ fun test_custom_coin() {
         whitelist_impl<FAKE_USDC>(&mut gateway, &whitelist_cap);
 
         let nonce = gateway.nonce();
-        let coins = withdraw_impl<FAKE_USDC>(
+        let (coins, coins_gas) = withdraw_impl<FAKE_USDC>(
             &mut gateway,
             13,
             nonce,
+            2,
             &withdraw_cap,
             scenario.ctx(),
         );
         assert!(coin::value(&coins) == 13);
+        assert!(coin::value(&coins_gas) == 2);
 
         ts::return_to_address(@0xA, whitelist_cap);
         ts::return_to_address(@0xA, withdraw_cap);
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
+        transfer::public_transfer(coins_gas, @0xA);
     };
     ts::end(scenario);
 }
