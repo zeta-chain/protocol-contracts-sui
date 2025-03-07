@@ -151,7 +151,7 @@ entry fun withdraw<T>(
     cap: &WithdrawCap,
     ctx: &mut TxContext,
 ) {
-    let (coins, coins_gas_budget) = withdraw_impl<T>(gateway, amount, gas_budget, nonce, cap, ctx);
+    let (coins, coins_gas_budget) = withdraw_impl<T>(gateway, amount, nonce, gas_budget, cap, ctx);
 
     transfer::public_transfer(coins, receiver);
     transfer::public_transfer(coins_gas_budget, tx_context::sender(ctx));
