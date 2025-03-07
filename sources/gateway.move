@@ -147,12 +147,14 @@ entry fun withdraw<T>(
     amount: u64,
     nonce: u64,
     receiver: address,
+    gas_budget: u64,
     cap: &WithdrawCap,
     ctx: &mut TxContext,
 ) {
-    let coin = withdraw_impl<T>(gateway, amount, nonce, cap, ctx);
+    let (coins, coins_gas_budget) = withdraw_impl<T>(gateway, amount, nonce, gas_budget, cap, ctx);
 
-    transfer::public_transfer(coin, receiver);
+    transfer::public_transfer(coins, receiver);
+    transfer::public_transfer(coins_gas_budget, tx_context::sender(ctx));
 
     // Emit event
     event::emit(WithdrawEvent {
@@ -200,14 +202,14 @@ entry fun unpause(gateway: &mut Gateway, cap: &AdminCap) {
 // deposit allows the user to deposit tokens into the gateway
 public entry fun deposit<T>(
     gateway: &mut Gateway,
-    coin: Coin<T>,
+    coins: Coin<T>,
     receiver: String,
     ctx: &mut TxContext,
 ) {
-    let amount = coin.value();
+    let amount = coins.value();
     let coin_name = coin_name<T>();
 
-    check_receiver_and_deposit_to_vault(gateway, coin, receiver);
+    check_receiver_and_deposit_to_vault(gateway, coins, receiver);
 
     // Emit deposit event
     event::emit(DepositEvent {
@@ -221,17 +223,17 @@ public entry fun deposit<T>(
 // deposit_and_call allows the user to deposit tokens into the gateway and call a contract
 public entry fun deposit_and_call<T>(
     gateway: &mut Gateway,
-    coin: Coin<T>,
+    coins: Coin<T>,
     receiver: String,
     payload: vector<u8>,
     ctx: &mut TxContext,
 ) {
     assert!(payload.length() <= PayloadMaxLength, EPayloadTooLong);
 
-    let amount = coin.value();
+    let amount = coins.value();
     let coin_name = coin_name<T>();
 
-    check_receiver_and_deposit_to_vault(gateway, coin, receiver);
+    check_receiver_and_deposit_to_vault(gateway, coins, receiver);
 
     // Emit deposit event
     event::emit(DepositAndCallEvent {
@@ -244,7 +246,7 @@ public entry fun deposit_and_call<T>(
 }
 
 // check_receiver_and_deposit_to_vault is a helper function that checks the receiver address and deposits the coin
-fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coin: Coin<T>, receiver: String) {
+fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coins: Coin<T>, receiver: String) {
     assert!(receiver.length() == ReceiverAddressLength, EInvalidReceiverAddress);
     assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
     assert!(!gateway.deposit_paused, EDepositPaused);
@@ -252,7 +254,7 @@ fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coin: Coin<T>,
     // Deposit the coin into the vault
     let coin_name = coin_name<T>();
     let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
-    balance::join(&mut vault.balance, coin.into_balance());
+    balance::join(&mut vault.balance, coins.into_balance());
 }
 
 // === Withdraw Functions ===
@@ -261,9 +263,10 @@ public fun withdraw_impl<T>(
     gateway: &mut Gateway,
     amount: u64,
     nonce: u64,
+    gas_budget: u64,
     cap: &WithdrawCap,
     ctx: &mut TxContext,
-): Coin<T> {
+): (Coin<T>, Coin<sui::sui::SUI>) {
     assert!(gateway.active_withdraw_cap == object::id(cap), EInactiveWithdrawCap);
     assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
     assert!(nonce == gateway.nonce, ENonceMismatch); // prevent replay
@@ -272,9 +275,16 @@ public fun withdraw_impl<T>(
     // Withdraw the coin from the vault
     let coin_name = coin_name<T>();
     let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
-    let coin_out = coin::take(&mut vault.balance, amount, ctx);
+    let coins_out = coin::take(&mut vault.balance, amount, ctx);
 
-    coin_out
+    // Withdraw SUI to cover the gas budget
+    let sui_vault = bag::borrow_mut<String, Vault<sui::sui::SUI>>(
+        &mut gateway.vaults,
+        coin_name<sui::sui::SUI>(),
+    );
+    let coins_gas_budget = coin::take(&mut sui_vault.balance, gas_budget, ctx);
+
+    (coins_out, coins_gas_budget)
 }
 
 // === Admin Functions ===
