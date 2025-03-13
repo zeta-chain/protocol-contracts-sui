@@ -113,6 +113,25 @@ fun test_deposit_invalid_address() {
     ts::end(scenario);
 }
 
+#[test, expected_failure(abort_code = EInvalidReceiverAddress)]
+fun test_deposit_invalid_address_2() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+
+        let coin = test_coin(&mut scenario);
+        let eth_addr = b"0xg531a5aB847ff5B22D855633C25ED1DA3255247e".to_string().to_ascii();
+
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
+
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
 #[test, expected_failure(abort_code = ENotWhitelisted)]
 fun test_deposit_not_whitelisted() {
     let mut scenario = ts::begin(@0xA);
