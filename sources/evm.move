@@ -1,25 +1,22 @@
 module gateway::evm;
 
-use std::ascii::{String, string, substring, into_bytes};
+use std::ascii::{String, substring, into_bytes};
 use std::vector::contains;
 
 /// Check if a given string is a valid Ethereum address.
-public fun is_valid_eth_address(addr: String): bool {
+public fun is_valid_evm_address(addr: String): bool {
     if (addr.length() != 42) {
         return false
     };
 
-    // check prefix 0x
-    if (substring(&addr, 0, 2) == string(b"0x")) {
+    // check prefix 0x, 0=48, x=120
+    let addrBytes = into_bytes(addr);
+    if (addrBytes[0] != 48 || addrBytes[1] != 120) {
         return false
     };
 
     // check if remaining characters are hex (0-9, a-f, A-F)
-    if (!is_hex_string(substring(&addr, 2, 42))) {
-        return false
-    };
-
-    true
+    is_hex_string(substring(&addr, 2, 42))
 }
 
 fun is_hex_string(s: String): bool {
