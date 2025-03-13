@@ -347,7 +347,7 @@ fun test_withdraw() {
         assert!(gateway.nonce() == 1);
         let coin = ts::take_from_address<Coin<SUI>>(&scenario, @0xA);
         assert!(coin::value(&coin) == 10);
-         let coin_gas = ts::take_from_address<Coin<SUI>>(&scenario, @0xB);
+        let coin_gas = ts::take_from_address<Coin<SUI>>(&scenario, @0xB);
         assert!(coin::value(&coin_gas) == 5);
         ts::return_to_address(@0xA, coin);
         ts::return_to_address(@0xB, coin_gas);
@@ -626,7 +626,7 @@ fun test_custom_coin() {
         init_fake_usdc(scenario.ctx());
     };
 
-     ts::next_tx(&mut scenario, @0xA);
+    ts::next_tx(&mut scenario, @0xA);
     {
         // deposit SUI
         let mut gateway = scenario.take_shared<Gateway>();

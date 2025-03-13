@@ -1,5 +1,6 @@
 module gateway::gateway;
 
+use gateway::evm;
 use std::ascii::String;
 use std::type_name::{get, into_string};
 use sui::bag::{Self, Bag};
@@ -7,7 +8,6 @@ use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin};
 use sui::event;
 use sui::sui::SUI;
-use gateway::evm;
 
 // === Errors ===
 
@@ -246,7 +246,11 @@ public entry fun deposit_and_call<T>(
 }
 
 // check_receiver_and_deposit_to_vault is a helper function that checks the receiver address and deposits the coin
-fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coins: Coin<T>, receiver: String) {
+fun check_receiver_and_deposit_to_vault<T>(
+    gateway: &mut Gateway,
+    coins: Coin<T>,
+    receiver: String,
+) {
     assert!(evm::is_valid_evm_address(receiver), EInvalidReceiverAddress);
     assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
     assert!(!gateway.deposit_paused, EDepositPaused);
