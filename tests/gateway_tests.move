@@ -113,6 +113,25 @@ fun test_deposit_invalid_address() {
     ts::end(scenario);
 }
 
+#[test, expected_failure(abort_code = EInvalidReceiverAddress)]
+fun test_deposit_invalid_address_2() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+
+        let coin = test_coin(&mut scenario);
+        let eth_addr = b"0xg531a5aB847ff5B22D855633C25ED1DA3255247e".to_string().to_ascii();
+
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
+
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
 #[test, expected_failure(abort_code = ENotWhitelisted)]
 fun test_deposit_not_whitelisted() {
     let mut scenario = ts::begin(@0xA);
@@ -328,7 +347,7 @@ fun test_withdraw() {
         assert!(gateway.nonce() == 1);
         let coin = ts::take_from_address<Coin<SUI>>(&scenario, @0xA);
         assert!(coin::value(&coin) == 10);
-         let coin_gas = ts::take_from_address<Coin<SUI>>(&scenario, @0xB);
+        let coin_gas = ts::take_from_address<Coin<SUI>>(&scenario, @0xB);
         assert!(coin::value(&coin_gas) == 5);
         ts::return_to_address(@0xA, coin);
         ts::return_to_address(@0xB, coin_gas);
@@ -607,7 +626,7 @@ fun test_custom_coin() {
         init_fake_usdc(scenario.ctx());
     };
 
-     ts::next_tx(&mut scenario, @0xA);
+    ts::next_tx(&mut scenario, @0xA);
     {
         // deposit SUI
         let mut gateway = scenario.take_shared<Gateway>();

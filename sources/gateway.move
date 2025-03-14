@@ -1,5 +1,6 @@
 module gateway::gateway;
 
+use gateway::evm;
 use std::ascii::String;
 use std::type_name::{get, into_string};
 use sui::bag::{Self, Bag};
@@ -19,7 +20,6 @@ const EInactiveWithdrawCap: u64 = 5;
 const EInactiveWhitelistCap: u64 = 6;
 const EDepositPaused: u64 = 7;
 
-const ReceiverAddressLength: u64 = 42;
 const PayloadMaxLength: u64 = 1024;
 
 // === Structs ===
@@ -246,8 +246,12 @@ public entry fun deposit_and_call<T>(
 }
 
 // check_receiver_and_deposit_to_vault is a helper function that checks the receiver address and deposits the coin
-fun check_receiver_and_deposit_to_vault<T>(gateway: &mut Gateway, coins: Coin<T>, receiver: String) {
-    assert!(receiver.length() == ReceiverAddressLength, EInvalidReceiverAddress);
+fun check_receiver_and_deposit_to_vault<T>(
+    gateway: &mut Gateway,
+    coins: Coin<T>,
+    receiver: String,
+) {
+    assert!(evm::is_valid_evm_address(receiver), EInvalidReceiverAddress);
     assert!(is_whitelisted<T>(gateway), ENotWhitelisted);
     assert!(!gateway.deposit_paused, EDepositPaused);
 
