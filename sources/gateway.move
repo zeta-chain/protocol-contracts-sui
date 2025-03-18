@@ -74,6 +74,7 @@ public struct DepositAndCallEvent has copy, drop {
     payload: vector<u8>,
 }
 
+// WithdrawEvent is emitted when a user withdraws tokens from the gateway
 public struct WithdrawEvent has copy, drop {
     coin_type: String,
     amount: u64,
@@ -142,6 +143,7 @@ entry fun increase_nonce(gateway: &mut Gateway, nonce: u64, cap: &WithdrawCap, c
 }
 
 // withdraw allows the TSS to withdraw tokens from the gateway
+// id of the withdrawn coin object is returned, it is used for withdrawAndCall in the PTB
 entry fun withdraw<T>(
     gateway: &mut Gateway,
     amount: u64,
@@ -150,8 +152,9 @@ entry fun withdraw<T>(
     gas_budget: u64,
     cap: &WithdrawCap,
     ctx: &mut TxContext,
-) {
+): ID {
     let (coins, coins_gas_budget) = withdraw_impl<T>(gateway, amount, nonce, gas_budget, cap, ctx);
+    let coinsID = object::id(&coins);
 
     transfer::public_transfer(coins, receiver);
     transfer::public_transfer(coins_gas_budget, tx_context::sender(ctx));
@@ -164,6 +167,8 @@ entry fun withdraw<T>(
         receiver: receiver,
         nonce: nonce,
     });
+
+    coinsID
 }
 
 // whitelist whitelists a new coin by creating a new vault for the coin type
