@@ -12,6 +12,7 @@ use gateway::gateway::{
     pause,
     unpause,
     is_paused,
+    reset_nonce,
     increase_nonce,
     withdraw_impl,
     is_whitelisted,
@@ -254,6 +255,28 @@ fun test_pause_and_resume_deposit() {
 
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test]
+fun test_reset_nonce() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        assert!(gateway.nonce() == 0);
+        reset_nonce(&mut gateway, 10, &admin_cap);
+        assert!(gateway.nonce() == 10);
+                reset_nonce(&mut gateway, 42, &admin_cap);
+        assert!(gateway.nonce() == 42);
+                reset_nonce(&mut gateway, 0, &admin_cap);
+        assert!(gateway.nonce() == 0);
+        ts::return_shared(gateway);
+        ts::return_to_address(@0xA, admin_cap);
     };
     ts::end(scenario);
 }

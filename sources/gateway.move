@@ -197,6 +197,11 @@ entry fun unpause(gateway: &mut Gateway, cap: &AdminCap) {
     unpause_impl(gateway, cap)
 }
 
+// reset_nonce resets the nonce to a new value in case it gets corrupted
+entry fun reset_nonce(gateway: &mut Gateway, nonce: u64, _cap: &AdminCap) {
+    gateway.nonce = nonce;
+}
+
 // === Deposit Functions ===
 
 // deposit allows the user to deposit tokens into the gateway
@@ -340,6 +345,7 @@ public fun pause_impl(gateway: &mut Gateway, _cap: &AdminCap) {
 public fun unpause_impl(gateway: &mut Gateway, _cap: &AdminCap) {
     gateway.deposit_paused = false;
 }
+
 
 // === View Functions ===
 
