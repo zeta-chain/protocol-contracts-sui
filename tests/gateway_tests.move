@@ -271,9 +271,9 @@ fun test_reset_nonce() {
         assert!(gateway.nonce() == 0);
         reset_nonce(&mut gateway, 10, &admin_cap);
         assert!(gateway.nonce() == 10);
-                reset_nonce(&mut gateway, 42, &admin_cap);
+        reset_nonce(&mut gateway, 42, &admin_cap);
         assert!(gateway.nonce() == 42);
-                reset_nonce(&mut gateway, 0, &admin_cap);
+        reset_nonce(&mut gateway, 0, &admin_cap);
         assert!(gateway.nonce() == 0);
         ts::return_shared(gateway);
         ts::return_to_address(@0xA, admin_cap);

@@ -346,7 +346,6 @@ public fun unpause_impl(gateway: &mut Gateway, _cap: &AdminCap) {
     gateway.deposit_paused = false;
 }
 
-
 // === View Functions ===
 
 public fun nonce(gateway: &Gateway): u64 {
