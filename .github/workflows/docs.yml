@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  generate-docs:
+  generate:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
