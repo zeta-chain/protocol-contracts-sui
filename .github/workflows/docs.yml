@@ -24,4 +24,12 @@ jobs:
           docker run -i -v $(pwd):/sui $SUI_IMAGE sui move build --doc
           mkdir -p docs
           rsync -a build/gateway/docs/gateway/ docs/
-          ls -la docs/
+
+      - name: Check for changes
+        run: |
+          if git diff --exit-code --ignore-space-change --ignore-all-space --ignore-cr-at-eol -- docs; then
+            echo "Generated Go files are up-to-date."
+          else
+            echo "::error::Generated files are not up-to-date. Please run 'yarn docs' locally and commit any changes."
+            exit 1
+          fi
