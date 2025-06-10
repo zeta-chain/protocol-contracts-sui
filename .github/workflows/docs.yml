@@ -27,7 +27,7 @@ jobs:
 
       - name: Check for changes
         run: |
-          if git diff --exit-code --ignore-space-change --ignore-all-space --ignore-cr-at-eol -- docs; then
+          if git diff --staged --exit-code --ignore-space-change --ignore-all-space --ignore-cr-at-eol -- docs; then
             echo "Generated Go files are up-to-date."
           else
             echo "::error::Generated files are not up-to-date. Please run 'yarn docs' locally and commit any changes."
