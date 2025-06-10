@@ -1,0 +1,27 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
+
+env:
+  SUI_IMAGE: ghcr.io/zeta-chain/sui-docker@sha256:0741082009ef5034cbb4a3e43215b1a37719a5a16f532e150a83add54a34316c
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: sui move build --doc
+        run: |
+          docker run -i -v $(pwd):/sui $SUI_IMAGE sui move build --doc
+          mkdir -p docs
+          cp -r build/gateway/docs/gateway/ docs/
+          ls -la docs/
