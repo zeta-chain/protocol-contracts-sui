@@ -25,11 +25,16 @@ jobs:
           mkdir -p docs
           rsync -a build/gateway/docs/gateway/ docs/
 
-      - name: Check for changes
+      - name: Check if docs/ changed
+        id: changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+
+      - name: Fail if docs changed
+        if: steps.changes.outputs.docs == 'true'
         run: |
-          if git diff --staged --exit-code --ignore-space-change --ignore-all-space --ignore-cr-at-eol -- docs; then
-            echo "Generated Go files are up-to-date."
-          else
-            echo "::error::Generated files are not up-to-date. Please run 'yarn docs' locally and commit any changes."
-            exit 1
-          fi
+          echo "❌ Changes detected in docs/"
+          exit 1
