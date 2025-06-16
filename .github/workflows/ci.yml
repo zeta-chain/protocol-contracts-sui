@@ -25,7 +25,6 @@ jobs:
             echo 'Sui version:' &&
             sui --version &&
             cd /sui &&
-            sui move clean &&
             rm -rf build/ &&
             rm -rf ~/.sui/ &&
             rm -rf ~/.move/ &&
