@@ -30,6 +30,7 @@ jobs:
             rm -rf ~/.sui/ &&
             rm -rf ~/.move/ &&
             sui move test
+          "
 
   ci-ok:
     runs-on: ubuntu-22.04
