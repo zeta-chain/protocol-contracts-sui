@@ -8,7 +8,7 @@ on:
       - '*'
 
 env:
-  SUI_IMAGE: ghcr.io/zeta-chain/sui-docker@sha256:aaa3ad09fcb369643a1dc889df085cd5d08fbf009e947678e204a77f9d09d3fa
+  SUI_IMAGE: ghcr.io/zeta-chain/sui-docker@sha256:0741082009ef5034cbb4a3e43215b1a37719a5a16f532e150a83add54a34316c
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
