@@ -19,15 +19,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: sui move clean and test
+      - name: sui move test
         run: |
           docker run --rm -i -v $(pwd):/sui $SUI_IMAGE sh -c "
             echo 'Sui version:' &&
             sui --version &&
             cd /sui &&
-            rm -rf build/ &&
-            rm -rf ~/.sui/ &&
-            rm -rf ~/.move/ &&
             sui move test
           "
 
