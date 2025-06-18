@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: sui move build
-        run: docker run -i -v $(pwd):/sui $SUI_IMAGE sui move build
+      - name: sui move test
+        run: docker run -i -v $(pwd):/sui $SUI_IMAGE sui move test
 
   ci-ok:
     runs-on: ubuntu-22.04
