@@ -8,7 +8,7 @@ on:
       - '*'
 
 env:
-  SUI_IMAGE: ghcr.io/zeta-chain/sui-docker@sha256:7958fe4cab73531abc93a6bc879216fed23084f6e4a1213e0f531a0f2de42eef
+  SUI_IMAGE: ghcr.io/zeta-chain/sui-docker:mainnet-v1.49.2
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,13 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: sui move test
-        run: |
-          docker run --rm -i -v $(pwd):/sui $SUI_IMAGE sh -c "
-            echo 'Sui version:' &&
-            sui --version &&
-            cd /sui &&
-            sui move test
-          "
+        run: docker run -i -v $(pwd):/sui $SUI_IMAGE sui move test
 
   ci-ok:
     runs-on: ubuntu-22.04
