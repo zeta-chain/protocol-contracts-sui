@@ -39,7 +39,7 @@ jobs:
           git add docs/
           git diff --staged --quiet docs/ || echo "docs_changed=true" >> $GITHUB_OUTPUT
 
-      - name: Print  if docs changed
+      - name: Print warning if docs changed
         if: steps.changes.outputs.docs_changed == 'true'
         run: |
           echo "⚠️ Changes detected in docs/"
