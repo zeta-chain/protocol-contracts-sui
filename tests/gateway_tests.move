@@ -95,6 +95,8 @@ fun test_deposit_and_call() {
     ts::end(scenario);
 }
 
+
+
 #[test, expected_failure(abort_code = EInvalidReceiverAddress)]
 fun test_deposit_invalid_address() {
     let mut scenario = ts::begin(@0xA);
@@ -169,6 +171,30 @@ fun test_deposit_paused() {
         deposit(&mut gateway, coin, eth_addr, scenario.ctx());
 
         ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test]
+fun test_donate() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+
+        let coin = test_coin(&mut scenario);
+
+        let balance_before = vault_balance<SUI>(&gateway);
+
+        // donate instead of deposit
+        gateway::gateway::donate(&mut gateway, coin, scenario.ctx());
+
+        let balance_after = vault_balance<SUI>(&gateway);
+        assert!(balance_after == balance_before + AmountTest);
+
         ts::return_shared(gateway);
     };
     ts::end(scenario);
