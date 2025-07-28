@@ -2,12 +2,14 @@ module gateway::gateway;
 
 use gateway::evm;
 use std::ascii::String;
+use std::ascii::string;
 use std::type_name::{get, into_string};
 use sui::bag::{Self, Bag};
 use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin};
 use sui::event;
 use sui::sui::SUI;
+
 
 // === Errors ===
 
@@ -85,6 +87,13 @@ public struct WithdrawEvent has copy, drop {
 public struct NonceIncreaseEvent has copy, drop {
     sender: address,
     nonce: u64,
+}
+
+// DonateEvent is emitted when a user donates tokens to the gateway
+public struct DonateEvent has copy, drop {
+    coin_type: String,
+    amount: u64,
+    sender: address,
 }
 
 // === Initialization ===
@@ -247,6 +256,27 @@ public entry fun deposit_and_call<T>(
         sender: tx_context::sender(ctx),
         receiver: receiver,
         payload: payload,
+    });
+}
+
+// donate allows the user to donate tokens to the gateway without triggering a deposit
+public entry fun donate<T>(
+    gateway: &mut Gateway,
+    coins: Coin<T>,
+    ctx: &mut TxContext,
+) {
+    let amount = coins.value();
+    let coin_name = coin_name<T>();
+
+    // use check_receiver_and_deposit_to_vault to deposit and provide the zero address as receiver
+    // receiver is only passed to the function to ensure the address is valid
+    check_receiver_and_deposit_to_vault(gateway, coins, string(b"0x0000000000000000000000000000000000000000"));
+
+    // Emit donate event
+    event::emit(DonateEvent {
+        coin_type: coin_name,
+        amount: amount,
+        sender: tx_context::sender(ctx),
     });
 }
 
