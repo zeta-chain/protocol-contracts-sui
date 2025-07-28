@@ -1,6 +1,7 @@
 #[test_only]
 module gateway::gateway_tests;
 
+use std::ascii;
 use gateway::fake_usdc::{FAKE_USDC, init_for_testing as init_fake_usdc};
 use gateway::gateway::{
     Gateway,
@@ -9,6 +10,7 @@ use gateway::gateway::{
     deposit,
     deposit_and_call,
     issue_withdraw_and_whitelist_cap_impl,
+    issue_message_context_impl,
     pause,
     unpause,
     is_paused,
@@ -19,9 +21,13 @@ use gateway::gateway::{
     vault_balance,
     active_withdraw_cap,
     active_whitelist_cap,
+    active_message_context,
+    message_context_sender,
+    message_context_target,
     WithdrawCap,
     WhitelistCap,
     AdminCap,
+    MessageContext,
     init_for_testing,
     create_test_withdraw_cap,
     create_test_whitelist_cap,
@@ -31,7 +37,10 @@ use gateway::gateway::{
     EInactiveWithdrawCap,
     EInactiveWhitelistCap,
     EAlreadyWhitelisted,
-    EDepositPaused
+    EDepositPaused,
+    EInvalidSenderAddress,
+    set_message_context,
+    reset_message_context,
 };
 use sui::coin::{Self, Coin};
 
@@ -665,6 +674,114 @@ fun test_unwhitelist_not_whitelisted() {
         unwhitelist_impl<FAKE_USDC>(&mut gateway, &cap);
 
         ts::return_to_address(@0xA, cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test]
+fun test_set_message_context() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let gateway = scenario.take_shared<Gateway>();
+        let mut message_context = ts::take_from_address<MessageContext>(&scenario, @0xA);
+
+        let valid_sender = ValidEthAddr.to_string().to_ascii();
+        let valid_target = @0xC;
+
+        set_message_context(&mut message_context, valid_sender, valid_target);
+
+        assert!(message_context_sender(&message_context) == valid_sender);
+        assert!(message_context_target(&message_context) == valid_target);
+        assert!(active_message_context(&gateway) == object::id(&message_context));
+
+        ts::return_to_address(@0xA, message_context);
+        ts::return_shared(gateway);
+    };
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let gateway = scenario.take_shared<Gateway>();
+        let mut message_context = ts::take_from_address<MessageContext>(&scenario, @0xA);
+
+        reset_message_context(&mut message_context);
+
+        assert!(message_context_sender(&message_context) == ascii::string(b""));
+        assert!(message_context_target(&message_context) == @0x0);
+        assert!(active_message_context(&gateway) == object::id(&message_context));
+
+        ts::return_to_address(@0xA, message_context);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = EInvalidSenderAddress)]
+fun test_set_message_context_invalid_sender() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut message_context = ts::take_from_address<MessageContext>(&scenario, @0xA);
+        let invalid_sender = ascii::string(b"0xinvalid");
+        let valid_target = @0xC;
+
+        set_message_context(&mut message_context, invalid_sender, valid_target);
+
+        ts::return_to_address(@0xA, message_context);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = EInvalidReceiverAddress)]
+fun test_set_message_context_invalid_target() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut message_context = ts::take_from_address<MessageContext>(&scenario, @0xA);
+        let valid_sender = ValidEthAddr.to_string().to_ascii();
+        let invalid_target = @0x0;
+
+        set_message_context(&mut message_context, valid_sender, invalid_target);
+
+        ts::return_to_address(@0xA, message_context);
+    };
+    ts::end(scenario);
+}
+
+#[test]
+fun test_issue_message_context() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        let old_message_context = ts::take_from_address<MessageContext>(&scenario, @0xA);
+
+        assert!(active_message_context(&gateway) == object::id(&old_message_context));
+
+        let mut message_context = issue_message_context_impl(
+            &mut gateway,
+            &admin_cap,
+            scenario.ctx(),
+        );
+        assert!(active_message_context(&gateway) == object::id(&message_context));
+
+        // can update new message context
+        let valid_sender = ValidEthAddr.to_string().to_ascii();
+        let valid_target = @0xC;
+        set_message_context(&mut message_context, valid_sender, valid_target);
+
+        transfer::public_freeze_object(message_context);
+        ts::return_to_address(@0xA, old_message_context);
+        ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
     };
     ts::end(scenario);
