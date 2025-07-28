@@ -412,47 +412,11 @@
 
 
 
-<a name="gateway_gateway_EDepositPaused"></a>
-
-
-
-<pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_EDepositPaused">EDepositPaused</a>: u64 = 7;
-</code></pre>
-
-
-
-<a name="gateway_gateway_EInactiveWhitelistCap"></a>
-
-
-
-<pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_EInactiveWhitelistCap">EInactiveWhitelistCap</a>: u64 = 6;
-</code></pre>
-
-
-
-<a name="gateway_gateway_EInactiveWithdrawCap"></a>
-
-
-
-<pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_EInactiveWithdrawCap">EInactiveWithdrawCap</a>: u64 = 5;
-</code></pre>
-
-
-
 <a name="gateway_gateway_EInvalidReceiverAddress"></a>
 
 
 
 <pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_EInvalidReceiverAddress">EInvalidReceiverAddress</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="gateway_gateway_ENonceMismatch"></a>
-
-
-
-<pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_ENonceMismatch">ENonceMismatch</a>: u64 = 3;
 </code></pre>
 
 
@@ -466,11 +430,47 @@
 
 
 
+<a name="gateway_gateway_ENonceMismatch"></a>
+
+
+
+<pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_ENonceMismatch">ENonceMismatch</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="gateway_gateway_EPayloadTooLong"></a>
 
 
 
 <pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_EPayloadTooLong">EPayloadTooLong</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="gateway_gateway_EInactiveWithdrawCap"></a>
+
+
+
+<pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_EInactiveWithdrawCap">EInactiveWithdrawCap</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="gateway_gateway_EInactiveWhitelistCap"></a>
+
+
+
+<pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_EInactiveWhitelistCap">EInactiveWhitelistCap</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="gateway_gateway_EDepositPaused"></a>
+
+
+
+<pre><code><b>const</b> <a href="../gateway/gateway.md#gateway_gateway_EDepositPaused">EDepositPaused</a>: u64 = 7;
 </code></pre>
 
 
