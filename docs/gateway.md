@@ -14,6 +14,7 @@
 -  [Struct `DepositAndCallEvent`](#gateway_gateway_DepositAndCallEvent)
 -  [Struct `WithdrawEvent`](#gateway_gateway_WithdrawEvent)
 -  [Struct `NonceIncreaseEvent`](#gateway_gateway_NonceIncreaseEvent)
+-  [Struct `DonateEvent`](#gateway_gateway_DonateEvent)
 -  [Constants](#@Constants_0)
 -  [Function `init`](#gateway_gateway_init)
 -  [Function `increase_nonce`](#gateway_gateway_increase_nonce)
@@ -26,6 +27,7 @@
 -  [Function `reset_nonce`](#gateway_gateway_reset_nonce)
 -  [Function `deposit`](#gateway_gateway_deposit)
 -  [Function `deposit_and_call`](#gateway_gateway_deposit_and_call)
+-  [Function `donate`](#gateway_gateway_donate)
 -  [Function `check_receiver_and_deposit_to_vault`](#gateway_gateway_check_receiver_and_deposit_to_vault)
 -  [Function `withdraw_impl`](#gateway_gateway_withdraw_impl)
 -  [Function `whitelist_impl`](#gateway_gateway_whitelist_impl)
@@ -390,6 +392,42 @@
 </dd>
 <dt>
 <code><a href="../gateway/gateway.md#gateway_gateway_nonce">nonce</a>: u64</code>
+</dt>
+<dd>
+</dd>
+</dl>
+
+
+</details>
+
+<a name="gateway_gateway_DonateEvent"></a>
+
+## Struct `DonateEvent`
+
+
+
+<pre><code><b>public</b> <b>struct</b> <a href="../gateway/gateway.md#gateway_gateway_DonateEvent">DonateEvent</a> <b>has</b> <b>copy</b>, drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>coin_type: <a href="../dependencies/std/ascii.md#std_ascii_String">std::ascii::String</a></code>
+</dt>
+<dd>
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+</dd>
+<dt>
+<code>sender: <b>address</b></code>
 </dt>
 <dd>
 </dd>
@@ -828,6 +866,44 @@
         sender: tx_context::sender(ctx),
         receiver: receiver,
         payload: payload,
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="gateway_gateway_donate"></a>
+
+## Function `donate`
+
+
+
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../gateway/gateway.md#gateway_gateway_donate">donate</a>&lt;T&gt;(<a href="../gateway/gateway.md#gateway_gateway">gateway</a>: &<b>mut</b> <a href="../gateway/gateway.md#gateway_gateway_Gateway">gateway::gateway::Gateway</a>, coins: <a href="../dependencies/sui/coin.md#sui_coin_Coin">sui::coin::Coin</a>&lt;T&gt;, ctx: &<b>mut</b> <a href="../dependencies/sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../gateway/gateway.md#gateway_gateway_donate">donate</a>&lt;T&gt;(
+    <a href="../gateway/gateway.md#gateway_gateway">gateway</a>: &<b>mut</b> <a href="../gateway/gateway.md#gateway_gateway_Gateway">Gateway</a>,
+    coins: Coin&lt;T&gt;,
+    ctx: &<b>mut</b> TxContext,
+) {
+    <b>let</b> amount = coins.value();
+    <b>let</b> <a href="../gateway/gateway.md#gateway_gateway_coin_name">coin_name</a> = <a href="../gateway/gateway.md#gateway_gateway_coin_name">coin_name</a>&lt;T&gt;();
+    // <b>use</b> <a href="../gateway/gateway.md#gateway_gateway_check_receiver_and_deposit_to_vault">check_receiver_and_deposit_to_vault</a> to <a href="../gateway/gateway.md#gateway_gateway_deposit">deposit</a> and provide the zero <b>address</b> <b>as</b> receiver
+    // receiver is only passed to the function to ensure the <b>address</b> is valid
+    <a href="../gateway/gateway.md#gateway_gateway_check_receiver_and_deposit_to_vault">check_receiver_and_deposit_to_vault</a>(<a href="../gateway/gateway.md#gateway_gateway">gateway</a>, coins, string(b"0x0000000000000000000000000000000000000000"));
+    // Emit <a href="../gateway/gateway.md#gateway_gateway_donate">donate</a> event
+    event::emit(<a href="../gateway/gateway.md#gateway_gateway_DonateEvent">DonateEvent</a> {
+        coin_type: <a href="../gateway/gateway.md#gateway_gateway_coin_name">coin_name</a>,
+        amount: amount,
+        sender: tx_context::sender(ctx),
     });
 }
 </code></pre>
