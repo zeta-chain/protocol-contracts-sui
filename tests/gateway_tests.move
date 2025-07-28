@@ -95,6 +95,8 @@ fun test_deposit_and_call() {
     ts::end(scenario);
 }
 
+
+
 #[test, expected_failure(abort_code = EInvalidReceiverAddress)]
 fun test_deposit_invalid_address() {
     let mut scenario = ts::begin(@0xA);
@@ -167,6 +169,69 @@ fun test_deposit_paused() {
 
         pause(&mut gateway, &admin_cap);
         deposit(&mut gateway, coin, eth_addr, scenario.ctx());
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test]
+fun test_donate() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+
+        let coin = test_coin(&mut scenario);
+
+        let balance_before = vault_balance<SUI>(&gateway);
+
+        // donate instead of deposit
+        gateway::gateway::donate(&mut gateway, coin, scenario.ctx());
+
+        let balance_after = vault_balance<SUI>(&gateway);
+        assert!(balance_after == balance_before + AmountTest);
+
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = ENotWhitelisted)]
+fun test_donate_not_whitelisted() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+
+        let coin = coin::mint_for_testing<FAKE_USDC>(AmountTest, scenario.ctx());
+
+        gateway::gateway::donate(&mut gateway, coin, scenario.ctx());
+
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = EDepositPaused)]
+fun test_donate_paused() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        let coin = test_coin(&mut scenario);
+
+        pause(&mut gateway, &admin_cap);
+        gateway::gateway::donate(&mut gateway, coin, scenario.ctx());
 
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);

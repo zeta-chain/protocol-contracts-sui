@@ -14,6 +14,7 @@
 -  [Struct `DepositAndCallEvent`](#gateway_gateway_DepositAndCallEvent)
 -  [Struct `WithdrawEvent`](#gateway_gateway_WithdrawEvent)
 -  [Struct `NonceIncreaseEvent`](#gateway_gateway_NonceIncreaseEvent)
+-  [Struct `DonateEvent`](#gateway_gateway_DonateEvent)
 -  [Constants](#@Constants_0)
 -  [Function `init`](#gateway_gateway_init)
 -  [Function `increase_nonce`](#gateway_gateway_increase_nonce)
@@ -26,6 +27,7 @@
 -  [Function `reset_nonce`](#gateway_gateway_reset_nonce)
 -  [Function `deposit`](#gateway_gateway_deposit)
 -  [Function `deposit_and_call`](#gateway_gateway_deposit_and_call)
+-  [Function `donate`](#gateway_gateway_donate)
 -  [Function `check_receiver_and_deposit_to_vault`](#gateway_gateway_check_receiver_and_deposit_to_vault)
 -  [Function `withdraw_impl`](#gateway_gateway_withdraw_impl)
 -  [Function `whitelist_impl`](#gateway_gateway_whitelist_impl)
@@ -390,6 +392,42 @@
 </dd>
 <dt>
 <code>nonce: u64</code>
+</dt>
+<dd>
+</dd>
+</dl>
+
+
+</details>
+
+
+
+## Struct `DonateEvent`
+
+
+
+<pre><code><b>public</b> <b>struct</b> DonateEvent <b>has</b> <b>copy</b>, drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>coin_type: std::ascii::String</code>
+</dt>
+<dd>
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+</dd>
+<dt>
+<code>sender: <b>address</b></code>
 </dt>
 <dd>
 </dd>
@@ -828,6 +866,44 @@
         sender: tx_context::sender(ctx),
         receiver: receiver,
         payload: payload,
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+
+
+## Function `donate`
+
+
+
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> donate&lt;T&gt;(gateway: &<b>mut</b> gateway::gateway::Gateway, coins: sui::coin::Coin&lt;T&gt;, ctx: &<b>mut</b> sui::tx_context::TxContext)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> donate&lt;T&gt;(
+    gateway: &<b>mut</b> Gateway,
+    coins: Coin&lt;T&gt;,
+    ctx: &<b>mut</b> TxContext,
+) {
+    <b>let</b> amount = coins.value();
+    <b>let</b> coin_name = coin_name&lt;T&gt;();
+    // <b>use</b> check_receiver_and_deposit_to_vault to deposit and provide the zero <b>address</b> <b>as</b> receiver
+    // receiver is only passed to the function to ensure the <b>address</b> is valid
+    check_receiver_and_deposit_to_vault(gateway, coins, string(b"0x0000000000000000000000000000000000000000"));
+    // Emit donate event
+    event::emit(DonateEvent {
+        coin_type: coin_name,
+        amount: amount,
+        sender: tx_context::sender(ctx),
     });
 }
 </code></pre>
