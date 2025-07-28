@@ -61,12 +61,14 @@
 <b>use</b> sui::event;
 <b>use</b> sui::hex;
 <b>use</b> sui::object;
+<b>use</b> sui::party;
 <b>use</b> sui::sui;
 <b>use</b> sui::table;
 <b>use</b> sui::transfer;
 <b>use</b> sui::tx_context;
 <b>use</b> sui::types;
 <b>use</b> sui::url;
+<b>use</b> sui::vec_map;
 <b>use</b> sui::vec_set;
 </code></pre>
 
@@ -414,43 +416,7 @@
 
 
 
-<pre><code><b>const</b> EDepositPaused: u64 = 7;
-</code></pre>
-
-
-
-
-
-
-
-<pre><code><b>const</b> EInactiveWhitelistCap: u64 = 6;
-</code></pre>
-
-
-
-
-
-
-
-<pre><code><b>const</b> EInactiveWithdrawCap: u64 = 5;
-</code></pre>
-
-
-
-
-
-
-
 <pre><code><b>const</b> EInvalidReceiverAddress: u64 = 1;
-</code></pre>
-
-
-
-
-
-
-
-<pre><code><b>const</b> ENonceMismatch: u64 = 3;
 </code></pre>
 
 
@@ -468,7 +434,43 @@
 
 
 
+<pre><code><b>const</b> ENonceMismatch: u64 = 3;
+</code></pre>
+
+
+
+
+
+
+
 <pre><code><b>const</b> EPayloadTooLong: u64 = 4;
+</code></pre>
+
+
+
+
+
+
+
+<pre><code><b>const</b> EInactiveWithdrawCap: u64 = 5;
+</code></pre>
+
+
+
+
+
+
+
+<pre><code><b>const</b> EInactiveWhitelistCap: u64 = 6;
+</code></pre>
+
+
+
+
+
+
+
+<pre><code><b>const</b> EDepositPaused: u64 = 7;
 </code></pre>
 
 
