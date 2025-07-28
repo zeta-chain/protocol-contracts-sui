@@ -5,7 +5,7 @@
   "version": "0.0.0-set-on-publish",
   "description": "ZetaChain protocol contracts on Sui",
   "scripts": {
-    "docs": "scripts/docs.sh"
+    "docs": "sui move build --doc && scripts/docs.sh"
   },
   "files": [
     "gateway.json"

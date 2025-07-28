@@ -29,9 +29,8 @@ jobs:
 
       - name: sui move build --doc
         run: |
-          docker run -i -v $(pwd):/sui $SUI_IMAGE yarn docs
-          mkdir -p docs
-          rsync -a build/gateway/docs/gateway/ docs/
+          docker run -i -v $(pwd):/sui $SUI_IMAGE sui move build --doc
+          yarn docs
 
       - name: Check if docs/ changed
         id: changes

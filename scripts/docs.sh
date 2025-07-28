@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-sui move build --doc
 rm -rf docs
 mkdir -p docs
 rsync -a build/gateway/docs/gateway/ docs/
