@@ -1,5 +1,5 @@
 
-<a name="gateway_evm"></a>
+
 
 # Module `gateway::evm`
 
@@ -9,21 +9,21 @@
 -  [Function `is_hex_vec`](#gateway_evm_is_hex_vec)
 
 
-<pre><code><b>use</b> <a href="../dependencies/std/ascii.md#std_ascii">std::ascii</a>;
-<b>use</b> <a href="../dependencies/std/option.md#std_option">std::option</a>;
-<b>use</b> <a href="../dependencies/std/vector.md#std_vector">std::vector</a>;
+<pre><code><b>use</b> std::ascii;
+<b>use</b> std::option;
+<b>use</b> std::vector;
 </code></pre>
 
 
 
-<a name="gateway_evm_is_valid_evm_address"></a>
+
 
 ## Function `is_valid_evm_address`
 
 Check if a given string is a valid Ethereum address.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../gateway/evm.md#gateway_evm_is_valid_evm_address">is_valid_evm_address</a>(addr: <a href="../dependencies/std/ascii.md#std_ascii_String">std::ascii::String</a>): bool
+<pre><code><b>public</b> <b>fun</b> is_valid_evm_address(addr: std::ascii::String): bool
 </code></pre>
 
 
@@ -32,7 +32,7 @@ Check if a given string is a valid Ethereum address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../gateway/evm.md#gateway_evm_is_valid_evm_address">is_valid_evm_address</a>(addr: String): bool {
+<pre><code><b>public</b> <b>fun</b> is_valid_evm_address(addr: String): bool {
     <b>if</b> (addr.length() != 42) {
         <b>return</b> <b>false</b>
     };
@@ -45,7 +45,7 @@ Check if a given string is a valid Ethereum address.
     addrBytes.remove(0);
     addrBytes.remove(0);
     // check <b>if</b> remaining characters are hex (0-9, a-f, A-F)
-    <a href="../gateway/evm.md#gateway_evm_is_hex_vec">is_hex_vec</a>(addrBytes)
+    is_hex_vec(addrBytes)
 }
 </code></pre>
 
@@ -53,14 +53,14 @@ Check if a given string is a valid Ethereum address.
 
 </details>
 
-<a name="gateway_evm_is_hex_vec"></a>
+
 
 ## Function `is_hex_vec`
 
 Check that vector contains only hex chars (0-9, a-f, A-F).
 
 
-<pre><code><b>fun</b> <a href="../gateway/evm.md#gateway_evm_is_hex_vec">is_hex_vec</a>(input: vector&lt;u8&gt;): bool
+<pre><code><b>fun</b> is_hex_vec(input: vector&lt;u8&gt;): bool
 </code></pre>
 
 
@@ -69,7 +69,7 @@ Check that vector contains only hex chars (0-9, a-f, A-F).
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../gateway/evm.md#gateway_evm_is_hex_vec">is_hex_vec</a>(input: vector&lt;u8&gt;): bool {
+<pre><code><b>fun</b> is_hex_vec(input: vector&lt;u8&gt;): bool {
     <b>let</b> <b>mut</b> i = 0;
     <b>let</b> len = input.length();
     <b>while</b> (i &lt; len) {
