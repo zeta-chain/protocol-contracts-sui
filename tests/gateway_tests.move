@@ -11,7 +11,6 @@ use gateway::gateway::{
     deposit_and_call,
     issue_withdraw_and_whitelist_cap_impl,
     issue_message_context,
-    issue_message_context_impl,
     pause,
     unpause,
     is_paused,
@@ -691,11 +690,7 @@ fun test_set_message_context() {
         let mut gateway = scenario.take_shared<Gateway>();
         let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
         
-        issue_message_context(
-            &mut gateway,
-            &admin_cap,
-            scenario.ctx(),
-        );
+        issue_message_context(&mut gateway, &admin_cap, scenario.ctx());
         
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
@@ -749,11 +744,7 @@ fun test_set_message_context_invalid_sender() {
         let mut gateway = scenario.take_shared<Gateway>();
         let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
         
-        issue_message_context(
-            &mut gateway,
-            &admin_cap,
-            scenario.ctx(),
-        );
+        issue_message_context(&mut gateway, &admin_cap, scenario.ctx());
         
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
@@ -784,11 +775,7 @@ fun test_set_message_context_invalid_target() {
         let mut gateway = scenario.take_shared<Gateway>();
         let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
         
-        issue_message_context(
-            &mut gateway,
-            &admin_cap,
-            scenario.ctx(),
-        );
+        issue_message_context(&mut gateway, &admin_cap, scenario.ctx());
         
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
@@ -813,25 +800,16 @@ fun test_issue_message_context() {
     let mut scenario = ts::begin(@0xA);
     setup(&mut scenario);
 
-    // active_message_context returns 0x0 when not initialized
-    ts::next_tx(&mut scenario, @0xA);
-    {
-        let gateway = scenario.take_shared<Gateway>();
-        assert!(active_message_context(&gateway) == object::id_from_address(@0x0));
-        ts::return_shared(gateway);
-    };
-
-    // issue first active message context ID dynamic field
+    // issue first active message context
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut gateway = scenario.take_shared<Gateway>();
         let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        // active_message_context returns 0x0 when not initialized
+        assert!(active_message_context(&gateway) == object::id_from_address(@0x0));
         
-        issue_message_context(
-            &mut gateway,
-            &admin_cap,
-            scenario.ctx(),
-        );
+        issue_message_context(&mut gateway, &admin_cap, scenario.ctx());
         
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
@@ -844,24 +822,58 @@ fun test_issue_message_context() {
         let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
         let old_message_context = ts::take_from_address<MessageContext>(&scenario, @0xA);
 
+        // old message context is active
         assert!(active_message_context(&gateway) == object::id(&old_message_context));
 
-        let mut message_context = issue_message_context_impl(
-            &mut gateway,
-            &admin_cap,
-            scenario.ctx(),
-        );
-        assert!(active_message_context(&gateway) == object::id(&message_context));
+        issue_message_context(&mut gateway, &admin_cap, scenario.ctx());
+
+        // old message context is no longer active
         assert!(active_message_context(&gateway) != object::id(&old_message_context));
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_to_address(@0xA, old_message_context);
+        ts::return_shared(gateway);
+    };
+
+    // the new message context should work without issue
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let gateway = scenario.take_shared<Gateway>();
+        
+        // take all MessageContext objects and find the one that matches the active ID
+        let message_context_1 = ts::take_from_address<MessageContext>(&scenario, @0xA);
+        let message_context_2 = ts::take_from_address<MessageContext>(&scenario, @0xA);
+        
+        let mut new_message_context;
+        if (active_message_context(&gateway) == object::id(&message_context_1)) {
+            new_message_context = message_context_1;
+            ts::return_to_address(@0xA, message_context_2);
+        } else if (active_message_context(&gateway) == object::id(&message_context_2)) {
+            new_message_context = message_context_2;
+            ts::return_to_address(@0xA, message_context_1);
+        } else {
+            // if neither matches, something is wrong
+            assert!(false);
+
+            // this is unreachable code, but it's here to make the compiler happy
+            new_message_context = message_context_1;
+            ts::return_to_address(@0xA, message_context_2);
+        };
 
         // can update new message context
         let valid_sender = ValidEthAddr.to_string().to_ascii();
         let valid_target = @0xC;
-        set_message_context(&mut message_context, valid_sender, valid_target);
+        set_message_context(&mut new_message_context, valid_sender, valid_target);
 
-        transfer::public_freeze_object(message_context);
-        ts::return_to_address(@0xA, old_message_context);
-        ts::return_to_address(@0xA, admin_cap);
+        assert!(message_context_sender(&new_message_context) == valid_sender);
+        assert!(message_context_target(&new_message_context) == valid_target);
+
+        // can reset new message context
+        reset_message_context(&mut new_message_context);
+        assert!(message_context_sender(&new_message_context) == ascii::string(b""));
+        assert!(message_context_target(&new_message_context) == @0x0);
+
+        ts::return_to_address(@0xA, new_message_context);
         ts::return_shared(gateway);
     };
     ts::end(scenario);
