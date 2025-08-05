@@ -848,16 +848,9 @@ fun test_issue_message_context() {
         if (active_message_context(&gateway) == object::id(&message_context_1)) {
             new_message_context = message_context_1;
             ts::return_to_address(@0xA, message_context_2);
-        } else if (active_message_context(&gateway) == object::id(&message_context_2)) {
+        } else {
             new_message_context = message_context_2;
             ts::return_to_address(@0xA, message_context_1);
-        } else {
-            // if neither matches, something is wrong
-            assert!(false);
-
-            // this is unreachable code, but it's here to make the compiler happy
-            new_message_context = message_context_1;
-            ts::return_to_address(@0xA, message_context_2);
         };
 
         // can update new message context
