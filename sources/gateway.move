@@ -10,7 +10,7 @@ use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin};
 use sui::event;
 use sui::sui::SUI;
-
+use sui::dynamic_field as df;
 
 // === Errors ===
 
@@ -25,6 +25,9 @@ const EDepositPaused: u64 = 7;
 const EInvalidSenderAddress: u64 = 8;
 
 const PayloadMaxLength: u64 = 1024;
+
+// === Dynamic Field Keys ===
+const ACTIVE_MESSAGE_CONTEXT_KEY: vector<u8> = b"active_message_context";
 
 // === Structs ===
 
@@ -41,7 +44,6 @@ public struct Gateway has key {
     nonce: u64,
     active_withdraw_cap: ID,
     active_whitelist_cap: ID,
-    active_message_context: ID,
     deposit_paused: bool,
 }
 
@@ -124,13 +126,6 @@ fun init(ctx: &mut TxContext) {
         id: object::new(ctx),
     };
 
-    // to set/reset the message context during authenticated calls, the caller must have the MessageContextCap
-    let message_context = MessageContext {
-        id: object::new(ctx),
-        sender: ascii::string(b""),
-        target: @0x0,
-    };
-
     // create and share the gateway object
     let mut gateway = Gateway {
         id: object::new(ctx),
@@ -138,7 +133,6 @@ fun init(ctx: &mut TxContext) {
         nonce: 0,
         active_withdraw_cap: object::id(&withdraw_cap),
         active_whitelist_cap: object::id(&whitelist_cap),
-        active_message_context: object::id(&message_context),
         deposit_paused: false,
     };
 
@@ -148,7 +142,6 @@ fun init(ctx: &mut TxContext) {
     transfer::transfer(withdraw_cap, tx_context::sender(ctx));
     transfer::transfer(whitelist_cap, tx_context::sender(ctx));
     transfer::transfer(admin_cap, tx_context::sender(ctx));
-    transfer::transfer(message_context, tx_context::sender(ctx));
     transfer::share_object(gateway);
 }
 
@@ -419,12 +412,18 @@ public fun issue_message_context_impl(
     _cap: &AdminCap,
     ctx: &mut TxContext,
 ): MessageContext {
+    // remove existing message context ID if any
+    df::remove_if_exists<vector<u8>, ID>(&mut gateway.id, ACTIVE_MESSAGE_CONTEXT_KEY);
+
+    // create a new message context
     let message_context = MessageContext {
         id: object::new(ctx),
         sender: ascii::string(b""),
         target: @0x0,
     };
-    gateway.active_message_context = object::id(&message_context);
+    
+    // store the new active message context ID in the dynamic field
+    df::add(&mut gateway.id, ACTIVE_MESSAGE_CONTEXT_KEY, object::id(&message_context));
     message_context
 }
 
@@ -451,7 +450,11 @@ public fun active_whitelist_cap(gateway: &Gateway): ID {
 }
 
 public fun active_message_context(gateway: &Gateway): ID {
-    gateway.active_message_context
+    if (df::exists_(&gateway.id, ACTIVE_MESSAGE_CONTEXT_KEY)) {
+        *df::borrow(&gateway.id, ACTIVE_MESSAGE_CONTEXT_KEY)
+    } else {
+        object::id_from_address(@0x0)
+    }
 }
 
 public fun message_context_sender(message_context: &MessageContext): String {

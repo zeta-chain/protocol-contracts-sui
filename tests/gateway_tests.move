@@ -10,6 +10,7 @@ use gateway::gateway::{
     deposit,
     deposit_and_call,
     issue_withdraw_and_whitelist_cap_impl,
+    issue_message_context,
     issue_message_context_impl,
     pause,
     unpause,
@@ -684,6 +685,23 @@ fun test_set_message_context() {
     let mut scenario = ts::begin(@0xA);
     setup(&mut scenario);
 
+    // issue an active message context ID dynamic field
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        
+        issue_message_context(
+            &mut gateway,
+            &admin_cap,
+            scenario.ctx(),
+        );
+        
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+
+    // then set the message context
     ts::next_tx(&mut scenario, @0xA);
     {
         let gateway = scenario.take_shared<Gateway>();
@@ -701,6 +719,8 @@ fun test_set_message_context() {
         ts::return_to_address(@0xA, message_context);
         ts::return_shared(gateway);
     };
+
+    // then reset the message context
     ts::next_tx(&mut scenario, @0xA);
     {
         let gateway = scenario.take_shared<Gateway>();
@@ -723,6 +743,23 @@ fun test_set_message_context_invalid_sender() {
     let mut scenario = ts::begin(@0xA);
     setup(&mut scenario);
 
+    // issue an active message context ID dynamic field
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        
+        issue_message_context(
+            &mut gateway,
+            &admin_cap,
+            scenario.ctx(),
+        );
+        
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+
+    // then set the message context with invalid sender
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut message_context = ts::take_from_address<MessageContext>(&scenario, @0xA);
@@ -741,6 +778,23 @@ fun test_set_message_context_invalid_target() {
     let mut scenario = ts::begin(@0xA);
     setup(&mut scenario);
 
+    // issue an active message context ID dynamic field
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        
+        issue_message_context(
+            &mut gateway,
+            &admin_cap,
+            scenario.ctx(),
+        );
+        
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+
+    // then set the message context with invalid target
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut message_context = ts::take_from_address<MessageContext>(&scenario, @0xA);
@@ -759,6 +813,31 @@ fun test_issue_message_context() {
     let mut scenario = ts::begin(@0xA);
     setup(&mut scenario);
 
+    // active_message_context returns 0x0 when not initialized
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let gateway = scenario.take_shared<Gateway>();
+        assert!(active_message_context(&gateway) == object::id_from_address(@0x0));
+        ts::return_shared(gateway);
+    };
+
+    // issue first active message context ID dynamic field
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        
+        issue_message_context(
+            &mut gateway,
+            &admin_cap,
+            scenario.ctx(),
+        );
+        
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+
+    // issue second active message context (should replace the first one)
     ts::next_tx(&mut scenario, @0xA);
     {
         let mut gateway = scenario.take_shared<Gateway>();
@@ -773,6 +852,7 @@ fun test_issue_message_context() {
             scenario.ctx(),
         );
         assert!(active_message_context(&gateway) == object::id(&message_context));
+        assert!(active_message_context(&gateway) != object::id(&old_message_context));
 
         // can update new message context
         let valid_sender = ValidEthAddr.to_string().to_ascii();
