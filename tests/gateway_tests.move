@@ -365,7 +365,7 @@ fun test_increase_nonce() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce();
-        increase_nonce(&mut gateway, nonce, &cap, scenario.ctx());
+        increase_nonce(&mut gateway, nonce, 5, &cap, scenario.ctx());
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
     };
@@ -373,7 +373,13 @@ fun test_increase_nonce() {
     {
         let gateway = scenario.take_shared<Gateway>();
         assert!(gateway.nonce() == 1);
+        
+        // caller should get reimbursed for the gas budget 5
+        let gas_coins = ts::take_from_address<Coin<SUI>>(&scenario, @0xA);
+        assert!(coin::value(&gas_coins) == 5);
+
         ts::return_shared(gateway);
+        ts::return_to_address(@0xA, gas_coins);
     };
     ts::end(scenario);
 }
@@ -388,7 +394,7 @@ fun test_test_increase_nonce_inactive_withdraw_cap() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = create_test_withdraw_cap(scenario.ctx());
         let nonce = gateway.nonce();
-        increase_nonce(&mut gateway, nonce, &cap, scenario.ctx());
+        increase_nonce(&mut gateway, nonce, 5, &cap, scenario.ctx());
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
     };
@@ -405,9 +411,34 @@ fun test_test_increase_nonce_wrong_nonce() {
         let mut gateway = scenario.take_shared<Gateway>();
         let cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
         let nonce = gateway.nonce() + 1; // intentially create a mismatch
-        increase_nonce(&mut gateway, nonce, &cap, scenario.ctx());
+        increase_nonce(&mut gateway, nonce, 5, &cap, scenario.ctx());
         ts::return_to_address(@0xA, cap);
         ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = ENotWhitelisted)]
+fun test_increase_nonce_sui_unwhitelisted() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        let withdraw_cap = ts::take_from_address<WithdrawCap>(&scenario, @0xA);
+        let whitelist_cap = ts::take_from_address<WhitelistCap>(&scenario, @0xA);
+        let nonce = gateway.nonce();
+
+        // intentionally unwhitelist SUI
+        unwhitelist_impl<SUI>(&mut gateway, &admin_cap);
+
+        increase_nonce(&mut gateway, nonce, 5, &withdraw_cap, scenario.ctx());
+        ts::return_shared(gateway);
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_to_address(@0xA, withdraw_cap);
+        ts::return_to_address(@0xA, whitelist_cap);
     };
     ts::end(scenario);
 }
