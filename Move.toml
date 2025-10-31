@@ -1,7 +1,6 @@
 [package]
 name = "gateway"
 edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
-published-at = "0x99578573550ef52ef4f1b0682fa5b822caedca3453f9d4c9bb48559f43ebcfa1"
 # license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
 # authors = ["..."]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
@@ -19,7 +18,7 @@ published-at = "0x99578573550ef52ef4f1b0682fa5b822caedca3453f9d4c9bb48559f43ebcf
 # Override = { local = "../conflicting/version", override = true }
 
 [addresses]
-gateway = "0x99578573550ef52ef4f1b0682fa5b822caedca3453f9d4c9bb48559f43ebcfa1"
+gateway = "0x0"
 
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.
