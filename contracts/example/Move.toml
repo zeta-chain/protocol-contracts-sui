@@ -6,7 +6,7 @@ published-at = "0xb8341e97cd48794aad9877297923586c137942f1647dd8b3ce70182113c100
 # authors = ["..."]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
 [dependencies]
-gateway = { local = "../"}
+gateway = { local = "../gateway"}
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.

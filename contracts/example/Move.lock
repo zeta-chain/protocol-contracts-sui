@@ -2,7 +2,7 @@
 
 [move]
 version = 3
-manifest_digest = "89C56F9B42CF34B5D2C2672AC730BA0FCE2A15376A645CA6CC72D27F91075D43"
+manifest_digest = "540B90B0BDF4F208EEEE9D76F38DE4C9240A0190640DD30688D3D5E828802CC7"
 deps_digest = "397E6A9F7A624706DBDFEE056CE88391A15876868FD18A88504DA74EB458D697"
 dependencies = [
   { id = "Bridge", name = "Bridge" },
@@ -45,7 +45,7 @@ dependencies = [
 
 [[move.package]]
 id = "gateway"
-source = { local = ".." }
+source = { local = "../gateway" }
 
 dependencies = [
   { id = "Bridge", name = "Bridge" },
