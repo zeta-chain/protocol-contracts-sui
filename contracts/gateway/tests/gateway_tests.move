@@ -858,7 +858,7 @@ fun test_issue_message_context() {
 
         issue_message_context(&mut gateway, &admin_cap, scenario.ctx());
 
-        // old message context is no longer active
+        // old message context no longer exists
         assert!(active_message_context(&gateway) != object::id(&old_message_context));
 
         ts::return_to_address(@0xA, admin_cap);

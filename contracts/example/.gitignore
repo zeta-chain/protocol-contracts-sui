@@ -1,0 +1,7 @@
+.idea
+.vscode
+
+build/*
+source/dependencies
+*.key
+.DS_Store

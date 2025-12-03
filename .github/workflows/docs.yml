@@ -30,18 +30,19 @@ jobs:
 
       - name: sui move build --doc
         run: |
+          cd contracts/gateway
           docker run -i -v $(pwd):/sui $SUI_IMAGE sui move build --doc
           yarn docs
 
       - name: Check if docs/ changed
         id: changes
         run: |
-          git add docs/
-          git diff --staged --quiet docs/ || echo "docs_changed=true" >> $GITHUB_OUTPUT
+          git add contracts/gateway/docs/
+          git diff --staged --quiet contracts/gateway/docs/ || echo "docs_changed=true" >> $GITHUB_OUTPUT
 
       - name: Print warning if docs changed
         if: steps.changes.outputs.docs_changed == 'true'
         run: |
-          echo "⚠️ Changes detected in docs/"
+          echo "⚠️ Changes detected in contracts/gateway/docs/"
           git status
-          git diff --staged docs/
+          git diff --staged contracts/gateway/docs/

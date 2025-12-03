@@ -21,7 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: sui move test
-        run: docker run -i -v $(pwd):/sui $SUI_IMAGE sui move test
+        run: |
+          cd contracts/gateway
+          docker run -i -v $(pwd):/sui $SUI_IMAGE sui move test
 
   ci-ok:
     runs-on: ubuntu-22.04
