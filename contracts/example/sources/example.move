@@ -4,17 +4,13 @@ use std::ascii;
 use std::ascii::String;
 use sui::address::from_bytes;
 use sui::coin::Coin;
-use gateway::gateway::{MessageContext, message_context_sender, message_context_target};
+use gateway::gateway::{MessageContext, ENonceMismatch, message_context_sender, message_context_target};
 
 // === Errors ===
 
 const EInvalidPayload: u64 = 1;
 
 const EUnauthorizedSender: u64 = 2;
-
-// ENonceMismatch is a fabricated nonce mismatch error code emitted from the on_call function
-// zetaclient should be able to differentiate this error from real withdraw_impl nonce mismatch
-const ENonceMismatch: u64 = 3;
 
 const EPackageMismatch: u64 = 4;
 
@@ -83,8 +79,9 @@ public entry fun on_call<SOURCE_COIN>(
     let actual_sender = message_context_sender(message_context);
     assert!(authenticated_sender == actual_sender, EUnauthorizedSender);
 
-    // check if the target package is my own package
-    // this prevents other package routing TSS calls to my package
+    // the message context target is the real intended package to be called by the TSS,
+    // so we check if the target package matches the example package address.
+    // this prevents other package from routing TSS calls to the example package.
     let actual_target = message_context_target(message_context);
     assert!(actual_target == target_package, EPackageMismatch);
 
