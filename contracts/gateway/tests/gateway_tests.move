@@ -41,6 +41,10 @@ use gateway::gateway::{
     EInvalidSenderAddress,
     set_message_context,
     reset_message_context,
+    refund,
+    EVaultNotFound,
+    EZeroAmount,
+    ESuiRefundNotAllowed,
 };
 use sui::coin::{Self, Coin};
 
@@ -1063,6 +1067,238 @@ fun test_custom_coin() {
         ts::return_shared(gateway);
         transfer::public_transfer(coins, @0xA);
         transfer::public_transfer(coins_gas, @0xA);
+    };
+    ts::end(scenario);
+}
+
+#[test_only]
+const RefundAmount: u64 = 13;
+
+#[test_only]
+const RefundReceiver: address = @0xC;
+
+#[test]
+fun test_refund() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        init_fake_usdc(scenario.ctx());
+    };
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let whitelist_cap = ts::take_from_address<WhitelistCap>(&scenario, @0xA);
+        whitelist_impl<FAKE_USDC>(&mut gateway, &whitelist_cap);
+
+        let coin = coin::mint_for_testing<FAKE_USDC>(AmountTest, scenario.ctx());
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
+        assert!(vault_balance<FAKE_USDC>(&gateway) == AmountTest);
+
+        ts::return_to_address(@0xA, whitelist_cap);
+        ts::return_shared(gateway);
+    };
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        let nonce_before = gateway.nonce();
+
+        refund<FAKE_USDC>(
+            &mut gateway,
+            RefundAmount,
+            RefundReceiver,
+            &admin_cap,
+            scenario.ctx(),
+        );
+
+        assert!(vault_balance<FAKE_USDC>(&gateway) == AmountTest - RefundAmount);
+        assert!(gateway.nonce() == nonce_before);
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+
+    ts::next_tx(&mut scenario, RefundReceiver);
+    {
+        let coin = ts::take_from_address<Coin<FAKE_USDC>>(&scenario, RefundReceiver);
+        assert!(coin::value(&coin) == RefundAmount);
+        ts::return_to_address(RefundReceiver, coin);
+    };
+
+    ts::end(scenario);
+}
+
+#[test]
+fun test_refund_unwhitelisted() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        init_fake_usdc(scenario.ctx());
+    };
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let whitelist_cap = ts::take_from_address<WhitelistCap>(&scenario, @0xA);
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        whitelist_impl<FAKE_USDC>(&mut gateway, &whitelist_cap);
+
+        let coin = coin::mint_for_testing<FAKE_USDC>(AmountTest, scenario.ctx());
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
+
+        unwhitelist_impl<FAKE_USDC>(&mut gateway, &admin_cap);
+        assert!(!is_whitelisted<FAKE_USDC>(&gateway));
+
+        refund<FAKE_USDC>(
+            &mut gateway,
+            RefundAmount,
+            RefundReceiver,
+            &admin_cap,
+            scenario.ctx(),
+        );
+
+        ts::return_to_address(@0xA, whitelist_cap);
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+
+    ts::next_tx(&mut scenario, RefundReceiver);
+    {
+        let coin = ts::take_from_address<Coin<FAKE_USDC>>(&scenario, RefundReceiver);
+        assert!(coin::value(&coin) == RefundAmount);
+        ts::return_to_address(RefundReceiver, coin);
+    };
+
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = ESuiRefundNotAllowed)]
+fun test_refund_sui_not_allowed() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        refund<SUI>(
+            &mut gateway,
+            RefundAmount,
+            RefundReceiver,
+            &admin_cap,
+            scenario.ctx(),
+        );
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = EInvalidReceiverAddress)]
+fun test_refund_zero_receiver() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        init_fake_usdc(scenario.ctx());
+    };
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let whitelist_cap = ts::take_from_address<WhitelistCap>(&scenario, @0xA);
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        whitelist_impl<FAKE_USDC>(&mut gateway, &whitelist_cap);
+
+        let coin = coin::mint_for_testing<FAKE_USDC>(AmountTest, scenario.ctx());
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
+
+        refund<FAKE_USDC>(
+            &mut gateway,
+            RefundAmount,
+            @0x0,
+            &admin_cap,
+            scenario.ctx(),
+        );
+
+        ts::return_to_address(@0xA, whitelist_cap);
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = EZeroAmount)]
+fun test_refund_zero_amount() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        init_fake_usdc(scenario.ctx());
+    };
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let whitelist_cap = ts::take_from_address<WhitelistCap>(&scenario, @0xA);
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        whitelist_impl<FAKE_USDC>(&mut gateway, &whitelist_cap);
+
+        let coin = coin::mint_for_testing<FAKE_USDC>(AmountTest, scenario.ctx());
+        let eth_addr = ValidEthAddr.to_string().to_ascii();
+        deposit(&mut gateway, coin, eth_addr, scenario.ctx());
+
+        refund<FAKE_USDC>(
+            &mut gateway,
+            0,
+            RefundReceiver,
+            &admin_cap,
+            scenario.ctx(),
+        );
+
+        ts::return_to_address(@0xA, whitelist_cap);
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
+    };
+    ts::end(scenario);
+}
+
+#[test, expected_failure(abort_code = EVaultNotFound)]
+fun test_refund_vault_not_found() {
+    let mut scenario = ts::begin(@0xA);
+    setup(&mut scenario);
+
+    ts::next_tx(&mut scenario, @0xA);
+    {
+        let mut gateway = scenario.take_shared<Gateway>();
+        let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+
+        refund<FAKE_USDC>(
+            &mut gateway,
+            RefundAmount,
+            RefundReceiver,
+            &admin_cap,
+            scenario.ctx(),
+        );
+
+        ts::return_to_address(@0xA, admin_cap);
+        ts::return_shared(gateway);
     };
     ts::end(scenario);
 }

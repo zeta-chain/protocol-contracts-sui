@@ -23,6 +23,9 @@ const EInactiveWithdrawCap: u64 = 5;
 const EInactiveWhitelistCap: u64 = 6;
 const EDepositPaused: u64 = 7;
 const EInvalidSenderAddress: u64 = 8;
+const EVaultNotFound: u64 = 9;
+const EZeroAmount: u64 = 10;
+const ESuiRefundNotAllowed: u64 = 11;
 
 const PayloadMaxLength: u64 = 1024;
 
@@ -106,6 +109,13 @@ public struct DonateEvent has copy, drop {
     coin_type: String,
     amount: u64,
     sender: address,
+}
+
+public struct RefundEvent has copy, drop {
+    coin_type: String,
+    amount: u64,
+    sender: address,
+    receiver: address,
 }
 
 // === Initialization ===
@@ -252,6 +262,25 @@ entry fun reset_nonce(gateway: &mut Gateway, nonce: u64, _cap: &AdminCap) {
     gateway.nonce = nonce;
 }
 
+// refund allows the admin to return tokens from custody to a Sui address during shutdown
+entry fun refund<T>(
+    gateway: &mut Gateway,
+    amount: u64,
+    receiver: address,
+    cap: &AdminCap,
+    ctx: &mut TxContext,
+) {
+    let coins = refund_impl<T>(gateway, amount, receiver, cap, ctx);
+    transfer::public_transfer(coins, receiver);
+
+    event::emit(RefundEvent {
+        coin_type: coin_name<T>(),
+        amount,
+        sender: tx_context::sender(ctx),
+        receiver,
+    });
+}
+
 // === Deposit Functions ===
 
 // deposit allows the user to deposit tokens into the gateway
@@ -365,6 +394,24 @@ public fun withdraw_impl<T>(
     let coins_gas_budget = coin::take(&mut sui_vault.balance, gas_budget, ctx);
 
     (coins_out, coins_gas_budget)
+}
+
+public fun refund_impl<T>(
+    gateway: &mut Gateway,
+    amount: u64,
+    receiver: address,
+    _cap: &AdminCap,
+    ctx: &mut TxContext,
+): Coin<T> {
+    assert!(receiver != @0x0, EInvalidReceiverAddress);
+    assert!(amount > 0, EZeroAmount);
+    assert!(coin_name<T>() != coin_name<SUI>(), ESuiRefundNotAllowed);
+
+    let coin_name = coin_name<T>();
+    assert!(bag::contains_with_type<String, Vault<T>>(&gateway.vaults, coin_name), EVaultNotFound);
+
+    let vault = bag::borrow_mut<String, Vault<T>>(&mut gateway.vaults, coin_name);
+    coin::take(&mut vault.balance, amount, ctx)
 }
 
 // === Admin Functions ===
