@@ -44,7 +44,6 @@ use gateway::gateway::{
     refund,
     EVaultNotFound,
     EZeroAmount,
-    ESuiRefundNotAllowed,
 };
 use sui::coin::{Self, Coin};
 
@@ -1181,8 +1180,8 @@ fun test_refund_unwhitelisted() {
     ts::end(scenario);
 }
 
-#[test, expected_failure(abort_code = ESuiRefundNotAllowed)]
-fun test_refund_sui_not_allowed() {
+#[test]
+fun test_refund_sui() {
     let mut scenario = ts::begin(@0xA);
     setup(&mut scenario);
 
@@ -1190,6 +1189,7 @@ fun test_refund_sui_not_allowed() {
     {
         let mut gateway = scenario.take_shared<Gateway>();
         let admin_cap = ts::take_from_address<AdminCap>(&scenario, @0xA);
+        let nonce_before = gateway.nonce();
 
         refund<SUI>(
             &mut gateway,
@@ -1199,9 +1199,20 @@ fun test_refund_sui_not_allowed() {
             scenario.ctx(),
         );
 
+        assert!(vault_balance<SUI>(&gateway) == AmountTest - RefundAmount);
+        assert!(gateway.nonce() == nonce_before);
+
         ts::return_to_address(@0xA, admin_cap);
         ts::return_shared(gateway);
     };
+
+    ts::next_tx(&mut scenario, RefundReceiver);
+    {
+        let coin = ts::take_from_address<Coin<SUI>>(&scenario, RefundReceiver);
+        assert!(coin::value(&coin) == RefundAmount);
+        ts::return_to_address(RefundReceiver, coin);
+    };
+
     ts::end(scenario);
 }
 

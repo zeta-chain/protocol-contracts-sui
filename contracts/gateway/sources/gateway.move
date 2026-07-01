@@ -25,7 +25,6 @@ const EDepositPaused: u64 = 7;
 const EInvalidSenderAddress: u64 = 8;
 const EVaultNotFound: u64 = 9;
 const EZeroAmount: u64 = 10;
-const ESuiRefundNotAllowed: u64 = 11;
 
 const PayloadMaxLength: u64 = 1024;
 
@@ -405,7 +404,6 @@ public fun refund_impl<T>(
 ): Coin<T> {
     assert!(receiver != @0x0, EInvalidReceiverAddress);
     assert!(amount > 0, EZeroAmount);
-    assert!(coin_name<T>() != coin_name<SUI>(), ESuiRefundNotAllowed);
 
     let coin_name = coin_name<T>();
     assert!(bag::contains_with_type<String, Vault<T>>(&gateway.vaults, coin_name), EVaultNotFound);
